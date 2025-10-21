@@ -8,11 +8,15 @@ from app.api.messages import router as messages_router
 from app.api.dealers import router as dealers_router
 from app.database import engine, Base
 
-# CRITICAL: Create all database tables - UNCOMMENTED
-Base.metadata.create_all(bind=engine)
-
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Create database tables only if they don't exist
+try:
+    Base.metadata.create_all(bind=engine, checkfirst=True)
+    logger.info("Database tables verified/created successfully")
+except Exception as e:
+    logger.warning(f"Database table creation warning: {e}")
 
 app = FastAPI(
     title="RevoMotors - Used Car AI Platform", 
@@ -20,16 +24,16 @@ app = FastAPI(
     description="AI-powered used car marketplace API"
 )
 
-# CORS Configuration - Already correct
+# CORS Configuration - Allow all origins
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allows all origins
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Include all routers
+# Include all API routers
 app.include_router(auth_router, prefix="/api/auth", tags=["auth"])
 app.include_router(leads_router, prefix="/api/leads", tags=["leads"])
 app.include_router(offers_router, prefix="/api/offers", tags=["offers"])
@@ -53,16 +57,14 @@ def health():
         "database": "connected"
     }
 
-# Startup event
 @app.on_event("startup")
 async def startup_event():
-    logger.info("Application starting up...")
-    logger.info("Database tables created successfully")
+    logger.info("RevoMotors API starting up...")
+    logger.info("All routers loaded successfully")
 
-# Shutdown event
 @app.on_event("shutdown")
 async def shutdown_event():
-    logger.info("Application shutting down...")
+    logger.info("RevoMotors API shutting down...")
 
 if __name__ == "__main__":
     import uvicorn
