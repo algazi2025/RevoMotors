@@ -1,1 +1,0 @@
-export default function LeadDetail() {return <div style={{padding: '2rem'}}><h1>Lead</h1></div>}
