@@ -8,20 +8,18 @@ from app.api.offers import router as offers_router
 from app.api.messages import router as messages_router
 from app.api.dealers import router as dealers_router
 from app.database import engine, Base
-from app import models  # CRITICAL: Import models to register them
+from app import models  # CRITICAL: Import models
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Force create all database tables
+# Create database tables if they don't exist
 try:
-    logger.info("Creating database tables...")
-    Base.metadata.drop_all(bind=engine)  # Drop existing tables
-    Base.metadata.create_all(bind=engine)  # Create fresh tables
-    logger.info("✅ Database tables created successfully!")
+    logger.info("Verifying database tables...")
+    Base.metadata.create_all(bind=engine, checkfirst=True)
+    logger.info("✅ Database tables ready!")
 except Exception as e:
-    logger.error(f"❌ Database error: {e}")
-    raise
+    logger.error(f"Database warning: {e}")
 
 app = FastAPI(
     title="RevoMotors - Used Car AI Platform", 
@@ -42,7 +40,7 @@ app.add_middleware(
 # Global exception handler
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    logger.error(f"Global error: {exc}", exc_info=True)
+    logger.error(f"Error: {exc}", exc_info=True)
     return JSONResponse(
         status_code=500,
         content={"detail": str(exc)},
@@ -62,32 +60,12 @@ app.include_router(dealers_router, prefix="/api/dealers", tags=["dealers"])
 
 @app.get("/")
 def root():
-    return {
-        "status": "ready",
-        "service": "RevoMotors API",
-        "version": "1.0.0"
-    }
+    return {"status": "ready", "service": "RevoMotors API", "version": "1.0.0"}
 
 @app.get("/health")
 def health():
-    return {
-        "status": "healthy",
-        "database": "connected"
-    }
-
-@app.on_event("startup")
-async def startup_event():
-    logger.info("🚀 RevoMotors API starting up...")
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    logger.info("👋 RevoMotors API shutting down...")
+    return {"status": "healthy", "database": "connected"}
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(
-        "app.main:app",
-        host="0.0.0.0",
-        port=8000,
-        reload=True
-    )
+    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
