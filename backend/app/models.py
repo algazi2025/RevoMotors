@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, Text, Enum, ForeignKey, JSON, DECIMAL, Date, Index
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, Text, Enum, ForeignKey, JSON, DECIMAL, Date
 from sqlalchemy.ext.declarative import declarative_base
 from datetime import datetime
 import enum
@@ -11,9 +11,9 @@ class UserRole(str, enum.Enum):
 
 class User(Base):
     __tablename__ = "users"
-    __table_args__ = (Index("ix_users_email", "email"),)
+    
     id = Column(Integer, primary_key=True)
-    email = Column(String(255), unique=True, index=True, nullable=False)
+    email = Column(String(255), unique=True, nullable=False)
     hashed_password = Column(String(255), nullable=False)
     role = Column(Enum(UserRole), nullable=False, default=UserRole.SELLER)
     first_name = Column(String(100))
@@ -22,6 +22,7 @@ class User(Base):
 
 class DealerProfile(Base):
     __tablename__ = "dealer_profiles"
+    
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True)
     company_name = Column(String(255), nullable=False)
@@ -30,13 +31,14 @@ class DealerProfile(Base):
 
 class SellerProfile(Base):
     __tablename__ = "seller_profiles"
+    
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 class CarListing(Base):
     __tablename__ = "car_listings"
-    __table_args__ = (Index("ix_car_listings_seller_id", "seller_id"),)
+    
     id = Column(Integer, primary_key=True)
     seller_id = Column(Integer, ForeignKey("seller_profiles.id"), nullable=False)
     title = Column(String(255), nullable=False)
@@ -50,7 +52,7 @@ class CarListing(Base):
 
 class Lead(Base):
     __tablename__ = "leads"
-    __table_args__ = (Index("ix_leads_dealer_id", "dealer_id"),)
+    
     id = Column(Integer, primary_key=True)
     listing_id = Column(Integer, ForeignKey("car_listings.id"), nullable=False)
     dealer_id = Column(Integer, ForeignKey("dealer_profiles.id"), nullable=False)
@@ -61,6 +63,7 @@ class Lead(Base):
 
 class Offer(Base):
     __tablename__ = "offers"
+    
     id = Column(Integer, primary_key=True)
     lead_id = Column(Integer, ForeignKey("leads.id"), nullable=False)
     dealer_id = Column(Integer, ForeignKey("users.id"), nullable=False)
@@ -69,6 +72,7 @@ class Offer(Base):
 
 class Message(Base):
     __tablename__ = "messages"
+    
     id = Column(Integer, primary_key=True)
     lead_id = Column(Integer, ForeignKey("leads.id"), nullable=False)
     sender_id = Column(Integer, ForeignKey("users.id"), nullable=False)
