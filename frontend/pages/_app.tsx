@@ -1,4 +1,4 @@
-# export default function App({Component, pageProps}) {return <Component {...pageProps} />}
+export default function App({Component, pageProps}) {return <Component {...pageProps} />}
 import React from 'react';
 import { Car, TrendingUp, Users, CheckCircle } from 'lucide-react';
 
