@@ -3,7 +3,7 @@ import React from 'react';
 export default function Home() {
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#ffffff', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' }}>
-      <div style={{ backgroundColor: 'white', borderBottom: '1px solid #f0f0f0', padding: '20px 0', position: 'sticky', top: 0, zIndex: 1000, backdropFilter: 'blur(10px)', backgroundColor: 'rgba(255,255,255,0.95)' }}>
+      <div style={{ borderBottom: '1px solid #f0f0f0', padding: '20px 0', position: 'sticky', top: 0, zIndex: 1000, backdropFilter: 'blur(10px)', backgroundColor: 'rgba(255,255,255,0.95)' }}>
         <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '0 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div style={{ width: '42px', height: '42px', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px' }}>🚗</div>
