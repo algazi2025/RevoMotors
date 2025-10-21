@@ -14,7 +14,6 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
-      {/* Header */}
       <header className="bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex justify-between items-center">
@@ -24,16 +23,10 @@ export default function Home() {
               </svg>
               <span className="text-2xl font-bold text-gray-900">RevoMotors</span>
             </div>
-            <nav className="hidden md:flex space-x-8">
-              <a href="#features" className="text-gray-600 hover:text-blue-600 transition">Features</a>
-              <a href="#how-it-works" className="text-gray-600 hover:text-blue-600 transition">How It Works</a>
-              <a href="/login" className="text-gray-600 hover:text-blue-600 transition">Login</a>
-            </nav>
           </div>
         </div>
       </header>
 
-      {/* Hero Section */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
         <div className="text-center">
           <h1 className="text-5xl md:text-6xl font-extrabold text-gray-900 mb-6">
@@ -45,24 +38,22 @@ export default function Home() {
             Connect sellers with verified dealers instantly. Get fair offers powered by advanced AI market analysis.
           </p>
 
-          {/* CTA Buttons */}
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
             <button
               onClick={handleSellerClick}
               className="w-full sm:w-auto px-8 py-4 bg-blue-600 text-white text-lg font-semibold rounded-lg hover:bg-blue-700 transition shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
             >
-              I'm a Seller
+              I am a Seller
             </button>
             <button
               onClick={handleDealerClick}
               className="w-full sm:w-auto px-8 py-4 bg-white text-blue-600 text-lg font-semibold rounded-lg border-2 border-blue-600 hover:bg-blue-50 transition shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
             >
-              I'm a Dealer
+              I am a Dealer
             </button>
           </div>
         </div>
 
-        {/* Stats */}
         <div className="mt-20 grid grid-cols-1 md:grid-cols-3 gap-8">
           <div className="text-center p-6 bg-white rounded-xl shadow-md">
             <div className="text-4xl font-bold text-blue-600 mb-2">15k+</div>
@@ -79,15 +70,13 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Features Section */}
-      <section id="features" className="bg-white py-20">
+      <section className="bg-white py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-4xl font-bold text-center text-gray-900 mb-12">
             Why Choose RevoMotors?
           </h2>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {/* Feature 1 */}
             <div className="p-6 rounded-xl border border-gray-200 hover:border-blue-300 transition">
               <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mb-4">
                 <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -100,7 +89,6 @@ export default function Home() {
               </p>
             </div>
 
-            {/* Feature 2 */}
             <div className="p-6 rounded-xl border border-gray-200 hover:border-blue-300 transition">
               <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mb-4">
                 <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -113,7 +101,6 @@ export default function Home() {
               </p>
             </div>
 
-            {/* Feature 3 */}
             <div className="p-6 rounded-xl border border-gray-200 hover:border-blue-300 transition">
               <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mb-4">
                 <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -129,8 +116,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* How It Works */}
-      <section id="how-it-works" className="py-20">
+      <section className="py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-4xl font-bold text-center text-gray-900 mb-12">
             How It Works
@@ -170,25 +156,11 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Footer */}
       <footer className="bg-gray-900 text-white py-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-            <div>
-              <div className="flex items-center space-x-2 mb-4">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span className="text-xl font-bold">RevoMotors</span>
-              </div>
-              <p className="text-gray-400">
-                The future of used car sales, powered by AI.
-              </p>
-            </div>
-            
-            <div>
-              <h4 className="font-semibold mb-4">For Sellers</h4>
-              <ul className="space-y-2 text-gray-400">
-                <li><a href="/seller/list-car" className="hover:text-white transition">List Your Car</a></li>
-                <li><a href="#how-it-works" className="hover:text-white transition">How It Works</a></li>
-                <li><a href="#" className="hover:text-white trans
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <p className="text-gray-400">&copy; 2025 RevoMotors. All rights reserved.</p>
+        </div>
+      </footer>
+    </div>
+  );
+}
