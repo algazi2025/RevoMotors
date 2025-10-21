@@ -17,16 +17,13 @@ ALGORITHM = "HS256"
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
-def hash_password(pwd):
-    # Truncate to 72 bytes for bcrypt compatibility
-    if isinstance(pwd, str):
-        pwd = pwd.encode('utf-8')[:400].decode('utf-8', errors='ignore')
-    return pwd_context.hash(pwd)
+def hash_password(pwd: str):
+    # Simple truncate to 72 characters for bcrypt
+    return pwd_context.hash(pwd[:72])
 
-def verify_password(plain, hashed):
-    if isinstance(plain, str):
-        plain = plain.encode('utf-8')[:400].decode('utf-8', errors='ignore')
-    return pwd_context.verify(plain, hashed)
+def verify_password(plain: str, hashed: str):
+    # Simple truncate to 72 characters for bcrypt
+    return pwd_context.verify(plain[:72], hashed)
 
 def create_token(user_id, role):
     expire = datetime.utcnow() + timedelta(days=30)
@@ -46,53 +43,69 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
 
 @router.post("/signup", response_model=schemas.TokenResponse)
 def signup(req: schemas.SignupRequest, db: Session = Depends(get_db)):
-    # Check if email exists
-    if db.query(User).filter(User.email == req.email).first():
-        raise HTTPException(status_code=400, detail="Email already exists")
-    
-    # Create user
-    user = User(
-        email=req.email,
-        hashed_password=hash_password(req.password),
-        first_name=req.first_name,
-        last_name=req.last_name,
-        role=UserRole(req.role)
-    )
-    db.add(user)
-    db.flush()
-    
-    # Create profile based on role
-    if user.role == UserRole.DEALER:
-        db.add(DealerProfile(user_id=user.id, company_name=req.first_name))
-    else:
-        db.add(SellerProfile(user_id=user.id))
-    
-    db.commit()
-    
-    # Generate token
-    token = create_token(user.id, user.role.value)
-    
-    return {
-        "access_token": token,
-        "token_type": "bearer",
-        "user_id": user.id,
-        "role": user.role.value
-    }
+    try:
+        # Check if email exists
+        existing_user = db.query(User).filter(User.email == req.email).first()
+        if existing_user:
+            raise HTTPException(status_code=400, detail="Email already exists")
+        
+        # Create user
+        user = User(
+            email=req.email,
+            hashed_password=hash_password(req.password),
+            first_name=req.first_name,
+            last_name=req.last_name,
+            role=UserRole(req.role)
+        )
+        db.add(user)
+        db.flush()
+        
+        # Create profile based on role
+        if user.role == UserRole.DEALER:
+            db.add(DealerProfile(user_id=user.id, company_name=req.first_name))
+        else:
+            db.add(SellerProfile(user_id=user.id))
+        
+        db.commit()
+        db.refresh(user)
+        
+        # Generate token
+        token = create_token(user.id, user.role.value)
+        
+        return {
+            "access_token": token,
+            "token_type": "bearer",
+            "user_id": user.id,
+            "role": user.role.value
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Signup error: {str(e)}")
 
 @router.post("/login", response_model=schemas.TokenResponse)
 def login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    # Find user by email
-    user = db.query(User).filter(User.email == form.username).first()
-    
-    if not user or not verify_password(form.password, user.hashed_password):
-        raise HTTPException(status_code=401, detail="Invalid email or password")
-    
-    # Generate token
-    token = create_token(user.id, user.role.value)
-    
-    return {
-        "access_token": token,
-        "token_type": "bearer",
-        "user_id": user.id,
-        "role": user.role.value
-    }
+    try:
+        # Find user by email
+        user = db.query(User).filter(User.email == form.username).first()
+        
+        if not user:
+            raise HTTPException(status_code=401, detail="Invalid email or password")
+        
+        if not verify_password(form.password, user.hashed_password):
+            raise HTTPException(status_code=401, detail="Invalid email or password")
+        
+        # Generate token
+        token = create_token(user.id, user.role.value)
+        
+        return {
+            "access_token": token,
+            "token_type": "bearer",
+            "user_id": user.id,
+            "role": user.role.value
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Login error: {str(e)}")
