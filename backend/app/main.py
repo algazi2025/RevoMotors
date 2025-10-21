@@ -2,24 +2,36 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import logging
+
+# CRITICAL: Import models BEFORE importing routers and database
+from app.models import Base, User, DealerProfile, SellerProfile, CarListing, Lead, Offer, Message
+from app.database import engine
+
+# Import routers AFTER models
 from app.auth import router as auth_router
 from app.api.leads import router as leads_router
 from app.api.offers import router as offers_router
 from app.api.messages import router as messages_router
 from app.api.dealers import router as dealers_router
-from app.database import engine, Base
-from app import models  # CRITICAL: Import models
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Create database tables if they don't exist
+# Create ALL database tables
+logger.info("Creating database tables...")
 try:
-    logger.info("Verifying database tables...")
-    Base.metadata.create_all(bind=engine, checkfirst=True)
-    logger.info("✅ Database tables ready!")
+    # This will now work because all models are imported above
+    Base.metadata.create_all(bind=engine)
+    logger.info("✅ Database tables created successfully!")
+    
+    # Verify tables exist
+    from sqlalchemy import inspect
+    inspector = inspect(engine)
+    tables = inspector.get_table_names()
+    logger.info(f"📋 Available tables: {tables}")
+    
 except Exception as e:
-    logger.error(f"Database warning: {e}")
+    logger.error(f"❌ Database error: {e}")
 
 app = FastAPI(
     title="RevoMotors - Used Car AI Platform", 
@@ -65,6 +77,10 @@ def root():
 @app.get("/health")
 def health():
     return {"status": "healthy", "database": "connected"}
+
+@app.on_event("startup")
+async def startup_event():
+    logger.info("🚀 RevoMotors API is ready!")
 
 if __name__ == "__main__":
     import uvicorn
