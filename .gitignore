@@ -205,3 +205,63 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+# Node.js / Frontend
+node_modules/
+npm-debug.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+package-lock.json
+yarn.lock
+
+# Next.js
+.next/
+out/
+.vercel
+*.tsbuildinfo
+```
+
+### **Step 3: Commit**
+1. Click **"Commit changes"**
+2. Add message: `Add Node.js ignore rules`
+3. Click **"Commit"** ✅
+
+---
+
+## Option 2: Add Locally (Better)
+
+If you already cloned the repo:
+
+### **Step 1: Open .gitignore locally**
+
+In your text editor, open:
+```
+used-car-platform/.gitignore
+```
+
+### **Step 2: Scroll to the bottom**
+
+Add these lines at the end:
+```
+# Node.js / Frontend
+node_modules/
+npm-debug.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+package-lock.json
+yarn.lock
+
+# Next.js
+.next/
+out/
+.vercel
+*.tsbuildinfo
+
+# Testing
+.coverage
+.pytest_cache/
