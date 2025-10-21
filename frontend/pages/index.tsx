@@ -1,17 +1,8 @@
 import React from 'react';
-import { Car, TrendingUp, Users, CheckCircle } from 'lucide-react';
+import Link from 'next/link';
+import { Car, TrendingUp, Users, CheckCircle, ArrowRight } from 'lucide-react';
 
-export default function Homepage() {
-  const handleSellerClick = () => {
-    // Navigate to seller flow
-    window.location.href = '/seller/list-car';
-  };
-
-  const handleDealerClick = () => {
-    // Navigate to dealer flow
-    window.location.href = '/dealer/dashboard';
-  };
-
+export default function Home() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
       {/* Header */}
@@ -25,7 +16,6 @@ export default function Homepage() {
             <nav className="hidden md:flex space-x-8">
               <a href="#features" className="text-gray-600 hover:text-blue-600 transition">Features</a>
               <a href="#how-it-works" className="text-gray-600 hover:text-blue-600 transition">How It Works</a>
-              <a href="/login" className="text-gray-600 hover:text-blue-600 transition">Login</a>
             </nav>
           </div>
         </div>
@@ -45,18 +35,16 @@ export default function Homepage() {
 
           {/* CTA Buttons */}
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-            <button
-              onClick={handleSellerClick}
-              className="w-full sm:w-auto px-8 py-4 bg-blue-600 text-white text-lg font-semibold rounded-lg hover:bg-blue-700 transition shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
-            >
-              I'm a Seller
-            </button>
-            <button
-              onClick={handleDealerClick}
-              className="w-full sm:w-auto px-8 py-4 bg-white text-blue-600 text-lg font-semibold rounded-lg border-2 border-blue-600 hover:bg-blue-50 transition shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
-            >
-              I'm a Dealer
-            </button>
+            <Link href="/seller/list-car">
+              <button className="w-full sm:w-auto px-8 py-4 bg-blue-600 text-white text-lg font-semibold rounded-lg hover:bg-blue-700 transition shadow-lg hover:shadow-xl transform hover:-translate-y-0.5">
+                I'm a Seller
+              </button>
+            </Link>
+            <Link href="/dealer/dashboard">
+              <button className="w-full sm:w-auto px-8 py-4 bg-white text-blue-600 text-lg font-semibold rounded-lg border-2 border-blue-600 hover:bg-blue-50 transition shadow-lg hover:shadow-xl transform hover:-translate-y-0.5">
+                I'm a Dealer
+              </button>
+            </Link>
           </div>
         </div>
 
@@ -85,7 +73,6 @@ export default function Homepage() {
           </h2>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {/* Feature 1 */}
             <div className="p-6 rounded-xl border border-gray-200 hover:border-blue-300 transition">
               <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mb-4">
                 <TrendingUp className="w-6 h-6 text-blue-600" />
@@ -96,7 +83,6 @@ export default function Homepage() {
               </p>
             </div>
 
-            {/* Feature 2 */}
             <div className="p-6 rounded-xl border border-gray-200 hover:border-blue-300 transition">
               <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mb-4">
                 <Users className="w-6 h-6 text-blue-600" />
@@ -107,7 +93,6 @@ export default function Homepage() {
               </p>
             </div>
 
-            {/* Feature 3 */}
             <div className="p-6 rounded-xl border border-gray-200 hover:border-blue-300 transition">
               <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mb-4">
                 <CheckCircle className="w-6 h-6 text-blue-600" />
@@ -179,18 +164,15 @@ export default function Homepage() {
             <div>
               <h4 className="font-semibold mb-4">For Sellers</h4>
               <ul className="space-y-2 text-gray-400">
-                <li><a href="/seller/list-car" className="hover:text-white transition">List Your Car</a></li>
-                <li><a href="#" className="hover:text-white transition">How It Works</a></li>
-                <li><a href="#" className="hover:text-white transition">Pricing</a></li>
+                <li><Link href="/seller/list-car" className="hover:text-white transition">List Your Car</Link></li>
+                <li><a href="#how-it-works" className="hover:text-white transition">How It Works</a></li>
               </ul>
             </div>
             
             <div>
               <h4 className="font-semibold mb-4">For Dealers</h4>
               <ul className="space-y-2 text-gray-400">
-                <li><a href="/dealer/signup" className="hover:text-white transition">Join as Dealer</a></li>
-                <li><a href="/dealer/dashboard" className="hover:text-white transition">Dashboard</a></li>
-                <li><a href="#" className="hover:text-white transition">API Docs</a></li>
+                <li><Link href="/dealer/dashboard" className="hover:text-white transition">Dashboard</Link></li>
               </ul>
             </div>
             
@@ -199,7 +181,6 @@ export default function Homepage() {
               <ul className="space-y-2 text-gray-400">
                 <li><a href="#" className="hover:text-white transition">About Us</a></li>
                 <li><a href="#" className="hover:text-white transition">Privacy Policy</a></li>
-                <li><a href="#" className="hover:text-white transition">Terms of Service</a></li>
               </ul>
             </div>
           </div>
