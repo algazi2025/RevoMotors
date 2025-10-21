@@ -1,0 +1,1 @@
+export default function ListCar() {return <div style={{padding: '2rem'}}><h1>List Car</h1></div>}

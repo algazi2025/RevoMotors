@@ -1,0 +1,1 @@
+export default function DealerLanding() {return <div style={{padding: '2rem'}}><h1>Dealer Landing</h1></div>}
