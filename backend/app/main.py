@@ -3,7 +3,10 @@ from fastapi.middleware.cors import CORSMiddleware
 import logging
 
 from app.auth import router as auth_router
-from app.api import leads, offers, messages, dealers
+from app.api.leads import router as leads_router
+from app.api.offers import router as offers_router
+from app.api.messages import router as messages_router
+from app.api.dealers import router as dealers_router
 from app.database import engine, Base
 
 # Base.metadata.create_all(bind=engine)
@@ -19,11 +22,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(auth_router.router, prefix="/api/auth", tags=["auth"])
-app.include_router(leads.router, prefix="/api/leads", tags=["leads"])
-app.include_router(offers.router, prefix="/api/offers", tags=["offers"])
-app.include_router(messages.router, prefix="/api/messages", tags=["messages"])
-app.include_router(dealers.router, prefix="/api/dealers", tags=["dealers"])
+app.include_router(auth_router, prefix="/api/auth", tags=["auth"])
+app.include_router(leads_router, prefix="/api/leads", tags=["leads"])
+app.include_router(offers_router, prefix="/api/offers", tags=["offers"])
+app.include_router(messages_router, prefix="/api/messages", tags=["messages"])
+app.include_router(dealers_router, prefix="/api/dealers", tags=["dealers"])
 
 @app.get("/")
 def root():
