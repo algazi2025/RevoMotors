@@ -15,32 +15,36 @@ export default function DealerLogin() {
     setError('');
 
     try {
+      const formBody = new URLSearchParams();
+      formBody.append('username', formData.email);
+      formBody.append('password', formData.password);
+
       const response = await fetch('https://revomotors.onrender.com/api/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
-        body: new URLSearchParams({
-          username: formData.email,
-          password: formData.password,
-        }),
+        body: formBody.toString(),
       });
 
-      const data = await response.json();
-
-      if (response.ok) {
-        // Store token in localStorage
-        localStorage.setItem('dealer_token', data.access_token);
-        localStorage.setItem('dealer_email', formData.email);
-        
-        // Redirect to dashboard
-        window.location.href = '/dealer/dashboard';
-      } else {
-        setError(data.detail || 'Invalid email or password');
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Login error:', errorText);
+        setError('Invalid email or password');
+        setLoading(false);
+        return;
       }
+
+      const data = await response.json();
+      console.log('Login success:', data);
+
+      localStorage.setItem('dealer_token', data.access_token);
+      localStorage.setItem('dealer_email', formData.email);
+      
+      window.location.href = '/dealer/dashboard';
     } catch (error) {
-      console.error('Error:', error);
-      setError('Connection error. Please try again.');
+      console.error('Connection error:', error);
+      setError('Cannot connect to server. Backend may be offline.');
     } finally {
       setLoading(false);
     }
@@ -124,16 +128,16 @@ export default function DealerLogin() {
 
           <div style={{ textAlign: 'center', fontSize: '14px', color: '#6b7280' }}>
             Don't have an account?{' '}
-            <Link href="/dealer/register" style={{ color: '#2563eb', textDecoration: 'none', fontWeight: '500' }}>
+            <a href="/dealer/register" style={{ color: '#2563eb', textDecoration: 'none', fontWeight: '500' }}>
               Register here
-            </Link>
+            </a>
           </div>
         </form>
 
         <div style={{ textAlign: 'center', marginTop: '20px' }}>
-          <Link href="/" style={{ color: '#6b7280', fontSize: '14px', textDecoration: 'none' }}>
+          <a href="/" style={{ color: '#6b7280', fontSize: '14px', textDecoration: 'none' }}>
             ← Back to Home
-          </Link>
+          </a>
         </div>
       </div>
     </div>

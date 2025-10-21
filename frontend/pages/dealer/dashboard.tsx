@@ -31,7 +31,6 @@ export default function DealerDashboard() {
   const [dealerEmail, setDealerEmail] = useState('');
 
   useEffect(() => {
-    // Check if user is logged in
     const token = localStorage.getItem('dealer_token');
     const email = localStorage.getItem('dealer_email');
     
@@ -41,8 +40,6 @@ export default function DealerDashboard() {
     }
 
     setDealerEmail(email || '');
-    
-    // Fetch leads from backend
     fetchLeads(token);
   }, []);
 
@@ -58,9 +55,10 @@ export default function DealerDashboard() {
         const data = await response.json();
         setLeads(data);
       } else if (response.status === 401) {
-        // Token expired, redirect to login
         localStorage.removeItem('dealer_token');
         window.location.href = '/dealer/login';
+      } else {
+        console.error('Failed to fetch leads');
       }
     } catch (error) {
       console.error('Error fetching leads:', error);
@@ -89,7 +87,7 @@ export default function DealerDashboard() {
           </div>
           <button 
             onClick={handleLogout}
-            style={{ color: '#2563eb', textDecoration: 'none', fontSize: '14px', background: 'none', border: 'none', cursor: 'pointer' }}
+            style={{ color: '#2563eb', textDecoration: 'none', fontSize: '14px', background: 'none', border: 'none', cursor: 'pointer', fontWeight: '500' }}
           >
             Logout →
           </button>
@@ -97,7 +95,6 @@ export default function DealerDashboard() {
       </header>
 
       <main style={{ maxWidth: '1400px', margin: '0 auto', padding: '40px 20px' }}>
-        {/* Stats */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px', marginBottom: '40px' }}>
           <div style={{ backgroundColor: 'white', padding: '25px', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
             <div style={{ fontSize: '36px', fontWeight: 'bold', color: '#2563eb', marginBottom: '10px' }}>
@@ -121,7 +118,6 @@ export default function DealerDashboard() {
           </div>
         </div>
 
-        {/* Leads Table */}
         <div style={{ backgroundColor: 'white', borderRadius: '8px', border: '1px solid #e5e7eb', overflow: 'hidden' }}>
           <div style={{ padding: '20px', borderBottom: '1px solid #e5e7eb' }}>
             <h2 style={{ fontSize: '20px', fontWeight: '600' }}>Recent Leads</h2>

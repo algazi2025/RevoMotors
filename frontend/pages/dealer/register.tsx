@@ -34,42 +34,45 @@ export default function DealerRegister() {
     }
 
     try {
+      const payload = {
+        email: formData.email,
+        password: formData.password,
+        first_name: formData.firstName,
+        last_name: formData.lastName,
+        role: 'dealer',
+        gdpr_consent: formData.gdprConsent,
+        ccpa_consent: formData.gdprConsent,
+      };
+
+      console.log('Sending registration:', payload);
+
       const response = await fetch('https://revomotors.onrender.com/api/auth/signup', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          email: formData.email,
-          password: formData.password,
-          first_name: formData.firstName,
-          last_name: formData.lastName,
-          role: 'dealer',
-          gdpr_consent: formData.gdprConsent,
-          ccpa_consent: formData.gdprConsent,
-          dealer_info: {
-            dealership_name: formData.dealershipName,
-            phone: formData.phone,
-            license_number: formData.licenseNumber,
-          },
-        }),
+        body: JSON.stringify(payload),
       });
 
-      const data = await response.json();
-
-      if (response.ok) {
-        // Store token
-        localStorage.setItem('dealer_token', data.access_token);
-        localStorage.setItem('dealer_email', formData.email);
-        
-        alert('Registration successful! Redirecting to dashboard...');
-        window.location.href = '/dealer/dashboard';
-      } else {
-        setError(data.detail || 'Registration failed. Email may already be in use.');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: 'Registration failed' }));
+        console.error('Registration error:', errorData);
+        setError(errorData.detail || 'Registration failed. Email may already be in use.');
+        setLoading(false);
+        return;
       }
+
+      const data = await response.json();
+      console.log('Registration success:', data);
+
+      localStorage.setItem('dealer_token', data.access_token);
+      localStorage.setItem('dealer_email', formData.email);
+      
+      alert('Registration successful! Redirecting to dashboard...');
+      window.location.href = '/dealer/dashboard';
     } catch (error) {
-      console.error('Error:', error);
-      setError('Connection error. Please try again.');
+      console.error('Connection error:', error);
+      setError('Cannot connect to server. Backend may be offline.');
     } finally {
       setLoading(false);
     }
@@ -246,16 +249,16 @@ export default function DealerRegister() {
 
           <div style={{ textAlign: 'center', fontSize: '14px', color: '#6b7280' }}>
             Already have an account?{' '}
-            <Link href="/dealer/login" style={{ color: '#2563eb', textDecoration: 'none', fontWeight: '500' }}>
+            <a href="/dealer/login" style={{ color: '#2563eb', textDecoration: 'none', fontWeight: '500' }}>
               Sign in here
-            </Link>
+            </a>
           </div>
         </form>
 
         <div style={{ textAlign: 'center', marginTop: '20px' }}>
-          <Link href="/" style={{ color: '#6b7280', fontSize: '14px', textDecoration: 'none' }}>
+          <a href="/" style={{ color: '#6b7280', fontSize: '14px', textDecoration: 'none' }}>
             ← Back to Home
-          </Link>
+          </a>
         </div>
       </div>
     </div>
