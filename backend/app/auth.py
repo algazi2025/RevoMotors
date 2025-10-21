@@ -20,12 +20,12 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 def hash_password(pwd):
     # Truncate to 72 bytes for bcrypt compatibility
     if isinstance(pwd, str):
-        pwd = pwd.encode('utf-8')[:72].decode('utf-8', errors='ignore')
+        pwd = pwd.encode('utf-8')[:400].decode('utf-8', errors='ignore')
     return pwd_context.hash(pwd)
 
 def verify_password(plain, hashed):
     if isinstance(plain, str):
-        plain = plain.encode('utf-8')[:72].decode('utf-8', errors='ignore')
+        plain = plain.encode('utf-8')[:400].decode('utf-8', errors='ignore')
     return pwd_context.verify(plain, hashed)
 
 def create_token(user_id, role):
