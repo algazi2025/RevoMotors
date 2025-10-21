@@ -6,7 +6,7 @@ from app.auth import router as auth_router
 from app.api import leads, offers, messages, dealers
 from app.database import engine, Base
 
-Base.metadata.create_all(bind=engine)
+# Base.metadata.create_all(bind=engine)
 logging.basicConfig(level=logging.INFO)
 
 app = FastAPI(title="Used Car AI Platform", version="1.0.0")
