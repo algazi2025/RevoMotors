@@ -1,12 +1,12 @@
-from app.database import init_db, SessionLocal
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import logging
+from sqlalchemy import text, inspect
 
 # CRITICAL: Import models BEFORE importing routers and database
 from app.models import Base, User, DealerProfile, SellerProfile, CarListing, Lead, Offer, Message
-from app.database import engine
+from app.database import engine, SessionLocal, init_db
 
 # Import routers AFTER models
 from app.auth import router as auth_router
@@ -27,7 +27,6 @@ try:
     logger.info("✅ Database tables created successfully!")
     
     # Verify tables exist
-    from sqlalchemy import inspect
     inspector = inspect(engine)
     tables = inspector.get_table_names()
     logger.info(f"📋 Available tables: {tables}")
@@ -85,10 +84,38 @@ def health():
 async def startup_event():
     logger.info("Initializing PostgreSQL database...")
     try:
-        init_db()  # Create car database tables
+        init_db()
         logger.info("✅ Car database initialized!")
     except Exception as e:
         logger.warning(f"Car database already initialized: {e}")
+    
+    # Add missing columns to dealer_profiles table
+    logger.info("Verifying dealer_profiles columns...")
+    try:
+        db = SessionLocal()
+        
+        # Add all missing columns
+        db.execute(text("""
+            ALTER TABLE dealer_profiles 
+            ADD COLUMN IF NOT EXISTS license_number VARCHAR(100),
+            ADD COLUMN IF NOT EXISTS phone VARCHAR(50),
+            ADD COLUMN IF NOT EXISTS address TEXT,
+            ADD COLUMN IF NOT EXISTS city VARCHAR(100),
+            ADD COLUMN IF NOT EXISTS state VARCHAR(50),
+            ADD COLUMN IF NOT EXISTS zip_code VARCHAR(20),
+            ADD COLUMN IF NOT EXISTS website VARCHAR(255),
+            ADD COLUMN IF NOT EXISTS verification_status VARCHAR(50) DEFAULT 'pending',
+            ADD COLUMN IF NOT EXISTS auto_followup_enabled BOOLEAN DEFAULT true,
+            ADD COLUMN IF NOT EXISTS followup_day_1 BOOLEAN DEFAULT true,
+            ADD COLUMN IF NOT EXISTS followup_day_3 BOOLEAN DEFAULT true,
+            ADD COLUMN IF NOT EXISTS followup_day_7 BOOLEAN DEFAULT true
+        """))
+        
+        db.commit()
+        db.close()
+        logger.info("✅ Dealer profile columns verified!")
+    except Exception as e:
+        logger.warning(f"Column verification: {e}")
     
     # Seed car data
     try:
