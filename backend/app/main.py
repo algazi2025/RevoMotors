@@ -121,6 +121,18 @@ async def startup_event():
             ADD COLUMN IF NOT EXISTS ai_rationale TEXT
         """))
         
+        # Create LeadSource enum type if it doesn't exist
+        try:
+            db.execute(text("""
+                CREATE TYPE leadsource AS ENUM (
+                    'hot_lead', 'facebook', 'offerup', 'craigslist', 
+                    'autotrader', 'carscom', 'cargurus'
+                )
+            """))
+            db.commit()
+        except:
+            db.rollback()  # Type might already exist
+        
         # Add missing columns to car_listings table
         db.execute(text("""
             ALTER TABLE car_listings 
@@ -131,7 +143,6 @@ async def startup_event():
             ADD COLUMN IF NOT EXISTS seller_phone VARCHAR(50),
             ADD COLUMN IF NOT EXISTS seller_email VARCHAR(255),
             ADD COLUMN IF NOT EXISTS seller_name VARCHAR(255),
-            ADD COLUMN IF NOT EXISTS source VARCHAR(50),
             ADD COLUMN IF NOT EXISTS zip_code VARCHAR(20),
             ADD COLUMN IF NOT EXISTS state VARCHAR(50),
             ADD COLUMN IF NOT EXISTS city VARCHAR(100),
