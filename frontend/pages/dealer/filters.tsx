@@ -46,6 +46,13 @@ export default function DealerFilters() {
     carscom: false,
   });
 
+  // Dropdown data
+  const [allMakes, setAllMakes] = useState<string[]>([]);
+  const [availableModels, setAvailableModels] = useState<string[]>([]);
+  const [availableYears, setAvailableYears] = useState<number[]>([]);
+  const [selectedMakes, setSelectedMakes] = useState<string[]>([]);
+  const [selectedModels, setSelectedModels] = useState<string[]>([]);
+
   useEffect(() => {
     const token = localStorage.getItem('dealer_token');
     if (!token) {
