@@ -1,410 +1,173 @@
 """
-Car Database API - Provides comprehensive vehicle information
+Car Database API - Queries from PostgreSQL database
+Provides comprehensive vehicle information
 Supports: Makes, Models, Trims, Years, Body Types, etc.
 """
 
-from fastapi import APIRouter, Query
-from typing import List, Optional
-import json
+from fastapi import APIRouter, Query, Depends
+from sqlalchemy.orm import Session
+from typing import List
+from database import get_db, Make, Model, Trim, BodyType, Transmission, FuelType
 
 router = APIRouter()
 
-# Comprehensive car database
-# In production, this would come from a real database or external API like NHTSA, Edmunds, etc.
-CAR_DATABASE = {
-    "Honda": {
-        "models": {
-            "Accord": {
-                "years": list(range(1990, 2026)),
-                "trims": ["LX", "Sport", "EX", "EX-L", "Touring"],
-                "body_types": ["Sedan"],
-                "transmissions": ["Automatic", "Manual", "CVT"],
-                "fuel_types": ["Gasoline", "Hybrid"]
-            },
-            "Civic": {
-                "years": list(range(1990, 2026)),
-                "trims": ["LX", "Sport", "EX", "EX-L", "Touring", "Si", "Type R"],
-                "body_types": ["Sedan", "Coupe", "Hatchback"],
-                "transmissions": ["Automatic", "Manual", "CVT"],
-                "fuel_types": ["Gasoline"]
-            },
-            "CR-V": {
-                "years": list(range(1997, 2026)),
-                "trims": ["LX", "EX", "EX-L", "Touring"],
-                "body_types": ["SUV"],
-                "transmissions": ["Automatic", "CVT"],
-                "fuel_types": ["Gasoline", "Hybrid"]
-            },
-            "Pilot": {
-                "years": list(range(2003, 2026)),
-                "trims": ["LX", "EX", "EX-L", "Touring", "Elite"],
-                "body_types": ["SUV"],
-                "transmissions": ["Automatic"],
-                "fuel_types": ["Gasoline"]
-            },
-            "Odyssey": {
-                "years": list(range(1995, 2026)),
-                "trims": ["LX", "EX", "EX-L", "Touring", "Elite"],
-                "body_types": ["Minivan"],
-                "transmissions": ["Automatic"],
-                "fuel_types": ["Gasoline"]
-            }
-        }
-    },
-    "Toyota": {
-        "models": {
-            "Camry": {
-                "years": list(range(1990, 2026)),
-                "trims": ["LE", "SE", "XLE", "XSE", "TRD"],
-                "body_types": ["Sedan"],
-                "transmissions": ["Automatic"],
-                "fuel_types": ["Gasoline", "Hybrid"]
-            },
-            "Corolla": {
-                "years": list(range(1990, 2026)),
-                "trims": ["L", "LE", "SE", "XLE", "XSE"],
-                "body_types": ["Sedan", "Hatchback"],
-                "transmissions": ["Automatic", "Manual", "CVT"],
-                "fuel_types": ["Gasoline", "Hybrid"]
-            },
-            "RAV4": {
-                "years": list(range(1996, 2026)),
-                "trims": ["LE", "XLE", "XLE Premium", "Adventure", "TRD Off-Road", "Limited"],
-                "body_types": ["SUV"],
-                "transmissions": ["Automatic"],
-                "fuel_types": ["Gasoline", "Hybrid"]
-            },
-            "Highlander": {
-                "years": list(range(2001, 2026)),
-                "trims": ["L", "LE", "XLE", "Limited", "Platinum"],
-                "body_types": ["SUV"],
-                "transmissions": ["Automatic"],
-                "fuel_types": ["Gasoline", "Hybrid"]
-            },
-            "Tacoma": {
-                "years": list(range(1995, 2026)),
-                "trims": ["SR", "SR5", "TRD Sport", "TRD Off-Road", "Limited", "TRD Pro"],
-                "body_types": ["Pickup Truck"],
-                "transmissions": ["Automatic", "Manual"],
-                "fuel_types": ["Gasoline"]
-            }
-        }
-    },
-    "Ford": {
-        "models": {
-            "F-150": {
-                "years": list(range(1990, 2026)),
-                "trims": ["XL", "XLT", "Lariat", "King Ranch", "Platinum", "Limited", "Raptor"],
-                "body_types": ["Pickup Truck"],
-                "transmissions": ["Automatic"],
-                "fuel_types": ["Gasoline", "Hybrid", "Electric"]
-            },
-            "Mustang": {
-                "years": list(range(1990, 2026)),
-                "trims": ["EcoBoost", "GT", "Mach 1", "Shelby GT500"],
-                "body_types": ["Coupe", "Convertible"],
-                "transmissions": ["Automatic", "Manual"],
-                "fuel_types": ["Gasoline"]
-            },
-            "Explorer": {
-                "years": list(range(1991, 2026)),
-                "trims": ["Base", "XLT", "Limited", "ST", "Platinum"],
-                "body_types": ["SUV"],
-                "transmissions": ["Automatic"],
-                "fuel_types": ["Gasoline", "Hybrid"]
-            },
-            "Escape": {
-                "years": list(range(2001, 2026)),
-                "trims": ["S", "SE", "SEL", "Titanium"],
-                "body_types": ["SUV"],
-                "transmissions": ["Automatic"],
-                "fuel_types": ["Gasoline", "Hybrid"]
-            }
-        }
-    },
-    "Chevrolet": {
-        "models": {
-            "Silverado 1500": {
-                "years": list(range(1999, 2026)),
-                "trims": ["WT", "Custom", "LT", "RST", "LTZ", "High Country"],
-                "body_types": ["Pickup Truck"],
-                "transmissions": ["Automatic"],
-                "fuel_types": ["Gasoline", "Diesel"]
-            },
-            "Malibu": {
-                "years": list(range(1997, 2026)),
-                "trims": ["L", "LS", "LT", "Premier"],
-                "body_types": ["Sedan"],
-                "transmissions": ["Automatic"],
-                "fuel_types": ["Gasoline", "Hybrid"]
-            },
-            "Equinox": {
-                "years": list(range(2005, 2026)),
-                "trims": ["L", "LS", "LT", "Premier"],
-                "body_types": ["SUV"],
-                "transmissions": ["Automatic"],
-                "fuel_types": ["Gasoline"]
-            },
-            "Tahoe": {
-                "years": list(range(1995, 2026)),
-                "trims": ["LS", "LT", "RST", "Z71", "Premier", "High Country"],
-                "body_types": ["SUV"],
-                "transmissions": ["Automatic"],
-                "fuel_types": ["Gasoline"]
-            }
-        }
-    },
-    "Nissan": {
-        "models": {
-            "Altima": {
-                "years": list(range(1993, 2026)),
-                "trims": ["S", "SV", "SR", "SL", "Platinum"],
-                "body_types": ["Sedan"],
-                "transmissions": ["Automatic", "CVT"],
-                "fuel_types": ["Gasoline"]
-            },
-            "Rogue": {
-                "years": list(range(2008, 2026)),
-                "trims": ["S", "SV", "SL", "Platinum"],
-                "body_types": ["SUV"],
-                "transmissions": ["CVT"],
-                "fuel_types": ["Gasoline"]
-            },
-            "Sentra": {
-                "years": list(range(1990, 2026)),
-                "trims": ["S", "SV", "SR"],
-                "body_types": ["Sedan"],
-                "transmissions": ["Automatic", "Manual", "CVT"],
-                "fuel_types": ["Gasoline"]
-            }
-        }
-    },
-    "BMW": {
-        "models": {
-            "3 Series": {
-                "years": list(range(1990, 2026)),
-                "trims": ["330i", "M340i", "M3"],
-                "body_types": ["Sedan"],
-                "transmissions": ["Automatic", "Manual"],
-                "fuel_types": ["Gasoline"]
-            },
-            "X5": {
-                "years": list(range(2000, 2026)),
-                "trims": ["sDrive40i", "xDrive40i", "M50i"],
-                "body_types": ["SUV"],
-                "transmissions": ["Automatic"],
-                "fuel_types": ["Gasoline", "Hybrid", "Diesel"]
-            }
-        }
-    },
-    "Mercedes-Benz": {
-        "models": {
-            "C-Class": {
-                "years": list(range(1993, 2026)),
-                "trims": ["C 300", "C 43 AMG", "C 63 AMG"],
-                "body_types": ["Sedan"],
-                "transmissions": ["Automatic"],
-                "fuel_types": ["Gasoline"]
-            },
-            "GLE": {
-                "years": list(range(1998, 2026)),
-                "trims": ["GLE 350", "GLE 450", "AMG GLE 53", "AMG GLE 63"],
-                "body_types": ["SUV"],
-                "transmissions": ["Automatic"],
-                "fuel_types": ["Gasoline", "Diesel", "Hybrid"]
-            }
-        }
-    },
-    "Tesla": {
-        "models": {
-            "Model 3": {
-                "years": list(range(2017, 2026)),
-                "trims": ["Standard Range Plus", "Long Range", "Performance"],
-                "body_types": ["Sedan"],
-                "transmissions": ["Single-Speed Automatic"],
-                "fuel_types": ["Electric"]
-            },
-            "Model Y": {
-                "years": list(range(2020, 2026)),
-                "trims": ["Long Range", "Performance"],
-                "body_types": ["SUV"],
-                "transmissions": ["Single-Speed Automatic"],
-                "fuel_types": ["Electric"]
-            },
-            "Model S": {
-                "years": list(range(2012, 2026)),
-                "trims": ["Long Range", "Plaid"],
-                "body_types": ["Sedan"],
-                "transmissions": ["Single-Speed Automatic"],
-                "fuel_types": ["Electric"]
-            }
-        }
-    },
-    "Jeep": {
-        "models": {
-            "Wrangler": {
-                "years": list(range(1990, 2026)),
-                "trims": ["Sport", "Sport S", "Sahara", "Rubicon"],
-                "body_types": ["SUV"],
-                "transmissions": ["Automatic", "Manual"],
-                "fuel_types": ["Gasoline", "Diesel", "Hybrid"]
-            },
-            "Grand Cherokee": {
-                "years": list(range(1993, 2026)),
-                "trims": ["Laredo", "Limited", "Overland", "Summit", "SRT", "Trackhawk"],
-                "body_types": ["SUV"],
-                "transmissions": ["Automatic"],
-                "fuel_types": ["Gasoline", "Diesel"]
-            }
-        }
-    },
-    "Subaru": {
-        "models": {
-            "Outback": {
-                "years": list(range(1995, 2026)),
-                "trims": ["Base", "Premium", "Limited", "Touring", "Wilderness"],
-                "body_types": ["Wagon"],
-                "transmissions": ["CVT"],
-                "fuel_types": ["Gasoline"]
-            },
-            "Forester": {
-                "years": list(range(1998, 2026)),
-                "trims": ["Base", "Premium", "Sport", "Limited", "Touring"],
-                "body_types": ["SUV"],
-                "transmissions": ["CVT"],
-                "fuel_types": ["Gasoline"]
-            }
-        }
-    }
-}
 
 @router.get("/makes")
-def get_all_makes():
+def get_all_makes(db: Session = Depends(get_db)):
     """Get all available car makes"""
-    makes = sorted(list(CAR_DATABASE.keys()))
-    return {"makes": makes}
+    makes = db.query(Make).all()
+    make_names = sorted([make.name for make in makes])
+    return {"makes": make_names}
+
 
 @router.get("/models")
-def get_models_by_make(make: str = Query(..., description="Car make")):
+def get_models_by_make(make: str = Query(..., description="Car make"), db: Session = Depends(get_db)):
     """Get all models for a specific make"""
-    make_data = CAR_DATABASE.get(make)
-    if not make_data:
-        return {"models": []}
+    make_obj = db.query(Make).filter(Make.name == make).first()
     
-    models = sorted(list(make_data["models"].keys()))
+    if not make_obj:
+        return {"make": make, "models": []}
+    
+    models = sorted([model.name for model in make_obj.models])
     return {"make": make, "models": models}
+
 
 @router.get("/trims")
 def get_trims_by_model(
     make: str = Query(..., description="Car make"),
-    model: str = Query(..., description="Car model")
+    model: str = Query(..., description="Car model"),
+    db: Session = Depends(get_db)
 ):
     """Get all trims for a specific make/model"""
-    make_data = CAR_DATABASE.get(make, {})
-    model_data = make_data.get("models", {}).get(model, {})
+    make_obj = db.query(Make).filter(Make.name == make).first()
     
-    return {
-        "make": make,
-        "model": model,
-        "trims": model_data.get("trims", [])
-    }
+    if not make_obj:
+        return {"make": make, "model": model, "trims": []}
+    
+    model_obj = db.query(Model).filter(
+        Model.make_id == make_obj.id,
+        Model.name == model
+    ).first()
+    
+    if not model_obj:
+        return {"make": make, "model": model, "trims": []}
+    
+    trims = sorted([trim.name for trim in model_obj.trims])
+    return {"make": make, "model": model, "trims": trims}
+
 
 @router.get("/years")
 def get_years_by_model(
     make: str = Query(..., description="Car make"),
-    model: str = Query(..., description="Car model")
+    model: str = Query(..., description="Car model"),
+    db: Session = Depends(get_db)
 ):
     """Get all available years for a specific make/model"""
-    make_data = CAR_DATABASE.get(make, {})
-    model_data = make_data.get("models", {}).get(model, {})
+    make_obj = db.query(Make).filter(Make.name == make).first()
     
-    years = model_data.get("years", [])
+    if not make_obj:
+        return {"make": make, "model": model, "years": []}
+    
+    model_obj = db.query(Model).filter(
+        Model.make_id == make_obj.id,
+        Model.name == model
+    ).first()
+    
+    if not model_obj:
+        return {"make": make, "model": model, "years": []}
+    
+    years = list(range(model_obj.year_min, model_obj.year_max + 1))
     years.sort(reverse=True)  # Most recent first
     
-    return {
-        "make": make,
-        "model": model,
-        "years": years
-    }
+    return {"make": make, "model": model, "years": years}
+
 
 @router.get("/details")
 def get_vehicle_details(
     make: str = Query(..., description="Car make"),
-    model: str = Query(..., description="Car model")
+    model: str = Query(..., description="Car model"),
+    db: Session = Depends(get_db)
 ):
     """Get all details (trims, years, body types, etc.) for a specific make/model"""
-    make_data = CAR_DATABASE.get(make, {})
-    model_data = make_data.get("models", {}).get(model, {})
+    make_obj = db.query(Make).filter(Make.name == make).first()
     
-    if not model_data:
-        return {"error": "Vehicle not found"}
+    if not make_obj:
+        return {"error": "Make not found"}
     
-    years = model_data.get("years", [])
+    model_obj = db.query(Model).filter(
+        Model.make_id == make_obj.id,
+        Model.name == model
+    ).first()
+    
+    if not model_obj:
+        return {"error": "Model not found"}
+    
+    years = list(range(model_obj.year_min, model_obj.year_max + 1))
     years.sort(reverse=True)
     
     return {
         "make": make,
         "model": model,
         "years": years,
-        "trims": model_data.get("trims", []),
-        "body_types": model_data.get("body_types", []),
-        "transmissions": model_data.get("transmissions", []),
-        "fuel_types": model_data.get("fuel_types", [])
+        "trims": sorted([trim.name for trim in model_obj.trims]),
+        "body_types": sorted([bt.name for bt in model_obj.body_types]),
+        "transmissions": sorted([t.name for t in model_obj.transmissions]),
+        "fuel_types": sorted([ft.name for ft in model_obj.fuel_types])
     }
 
+
 @router.get("/search")
-def search_vehicles(query: str = Query(..., min_length=2)):
+def search_vehicles(query: str = Query(..., min_length=2), db: Session = Depends(get_db)):
     """Search for vehicles by make or model name"""
     query_lower = query.lower()
     results = []
     
-    for make, make_data in CAR_DATABASE.items():
-        # Check if make matches
-        if query_lower in make.lower():
-            for model in make_data["models"].keys():
-                results.append({
-                    "make": make,
-                    "model": model,
-                    "label": f"{make} {model}"
-                })
-        else:
-            # Check if model matches
-            for model in make_data["models"].keys():
-                if query_lower in model.lower():
-                    results.append({
-                        "make": make,
-                        "model": model,
-                        "label": f"{make} {model}"
-                    })
+    # Search by make
+    makes = db.query(Make).filter(Make.name.ilike(f"%{query_lower}%")).all()
+    for make in makes:
+        for model in make.models:
+            results.append({
+                "make": make.name,
+                "model": model.name,
+                "label": f"{make.name} {model.name}"
+            })
+    
+    # Search by model (if not already found by make)
+    models = db.query(Model).filter(Model.name.ilike(f"%{query_lower}%")).all()
+    for model in models:
+        already_found = any(
+            r["make"] == model.make.name and r["model"] == model.name
+            for r in results
+        )
+        if not already_found:
+            results.append({
+                "make": model.make.name,
+                "model": model.name,
+                "label": f"{model.make.name} {model.name}"
+            })
     
     return {"results": results[:20]}  # Limit to 20 results
 
+
 @router.get("/all-body-types")
-def get_all_body_types():
+def get_all_body_types(db: Session = Depends(get_db)):
     """Get all unique body types"""
-    body_types = set()
-    for make_data in CAR_DATABASE.values():
-        for model_data in make_data["models"].values():
-            body_types.update(model_data.get("body_types", []))
-    
-    return {"body_types": sorted(list(body_types))}
+    body_types = db.query(BodyType).all()
+    body_type_names = sorted([bt.name for bt in body_types])
+    return {"body_types": body_type_names}
+
 
 @router.get("/all-transmissions")
-def get_all_transmissions():
+def get_all_transmissions(db: Session = Depends(get_db)):
     """Get all unique transmission types"""
-    transmissions = set()
-    for make_data in CAR_DATABASE.values():
-        for model_data in make_data["models"].values():
-            transmissions.update(model_data.get("transmissions", []))
-    
-    return {"transmissions": sorted(list(transmissions))}
+    transmissions = db.query(Transmission).all()
+    transmission_names = sorted([t.name for t in transmissions])
+    return {"transmissions": transmission_names}
+
 
 @router.get("/all-fuel-types")
-def get_all_fuel_types():
+def get_all_fuel_types(db: Session = Depends(get_db)):
     """Get all unique fuel types"""
-    fuel_types = set()
-    for make_data in CAR_DATABASE.values():
-        for model_data in make_data["models"].values():
-            fuel_types.update(model_data.get("fuel_types", []))
-    
-    return {"fuel_types": sorted(list(fuel_types))}
+    fuel_types = db.query(FuelType).all()
+    fuel_type_names = sorted([ft.name for ft in fuel_types])
+    return {"fuel_types": fuel_type_names}

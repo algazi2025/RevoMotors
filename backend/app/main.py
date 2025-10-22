@@ -1,3 +1,4 @@
+from app.database import init_db, SessionLocal
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -14,7 +15,6 @@ from app.api.offers import router as offers_router
 from app.api.messages import router as messages_router
 from app.api.dealers import router as dealers_router
 from app.api.car_database import router as car_database_router
-
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -73,7 +73,6 @@ app.include_router(messages_router, prefix="/api/messages", tags=["messages"])
 app.include_router(dealers_router, prefix="/api/dealers", tags=["dealers"])
 app.include_router(car_database_router, prefix="/api/cars", tags=["cars"])
 
-
 @app.get("/")
 def root():
     return {"status": "ready", "service": "RevoMotors API", "version": "1.0.0"}
@@ -84,6 +83,13 @@ def health():
 
 @app.on_event("startup")
 async def startup_event():
+    logger.info("Initializing PostgreSQL database...")
+    try:
+        init_db()  # Create car database tables
+        logger.info("✅ Car database initialized!")
+    except Exception as e:
+        logger.warning(f"Car database already initialized: {e}")
+    
     logger.info("🚀 RevoMotors API is ready!")
 
 if __name__ == "__main__":
