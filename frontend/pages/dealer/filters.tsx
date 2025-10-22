@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 
 interface Filter {
   id: number;
+  name: string;
   vehicle_filters: {
     makes: string[];
     models: string[];
@@ -32,7 +33,8 @@ export default function DealerFilters() {
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
   const [newFilter, setNewFilter] = useState({
-    make: '',
+    name: '',
+    makes: [] as string[],
     models: [] as string[],
     year_min: '',
     year_max: '',
@@ -50,7 +52,6 @@ export default function DealerFilters() {
 
   const [allMakes, setAllMakes] = useState<string[]>([]);
   const [availableModels, setAvailableModels] = useState<string[]>([]);
-  const [availableYears, setAvailableYears] = useState<number[]>([]);
   const [loadingDropdowns, setLoadingDropdowns] = useState(false);
   
   const [makeSearchInput, setMakeSearchInput] = useState('');
@@ -66,7 +67,7 @@ export default function DealerFilters() {
     }
     
     fetchMakes();
-     fetchFilters(token);  // COMMENTED OUT - TESTING
+    // fetchFilters(token);  // COMMENTED OUT - TESTING
   }, []);
 
   const fetchMakes = async () => {
@@ -89,60 +90,42 @@ export default function DealerFilters() {
     model.toLowerCase().includes(modelSearchInput.toLowerCase())
   );
 
-  const handleMakeChange = async (make: string) => {
+  const handleMakeToggle = async (make: string) => {
+    const updatedMakes = newFilter.makes.includes(make)
+      ? newFilter.makes.filter(m => m !== make)
+      : [...newFilter.makes, make];
+    
     setNewFilter({
       ...newFilter,
-      make,
-      models: [],
-      year_min: '',
-      year_max: '',
+      makes: updatedMakes,
+      models: [], // Clear models when make changes
     });
-    setMakeSearchInput(make);
-    setShowMakeDropdown(false);
+    
     setAvailableModels([]);
-    setAvailableYears([]);
     setModelSearchInput('');
 
-    if (!make) return;
-
-    setLoadingDropdowns(true);
-    try {
-      const response = await fetch(`${API_BASE}/models?make=${encodeURIComponent(make)}`);
-      if (response.ok) {
-        const data = await response.json();
-        setAvailableModels(data.models || []);
+    // Fetch models for first selected make
+    if (updatedMakes.length > 0) {
+      setLoadingDropdowns(true);
+      try {
+        const response = await fetch(`${API_BASE}/models?make=${encodeURIComponent(updatedMakes[0])}`);
+        if (response.ok) {
+          const data = await response.json();
+          setAvailableModels(data.models || []);
+        }
+      } catch (error) {
+        console.error('Error fetching models:', error);
+      } finally {
+        setLoadingDropdowns(false);
       }
-    } catch (error) {
-      console.error('Error fetching models:', error);
-    } finally {
-      setLoadingDropdowns(false);
     }
   };
 
-  const handleModelChange = async (model: string, isAdd: boolean) => {
-    if (isAdd) {
-      const updatedModels = newFilter.models.includes(model)
-        ? newFilter.models.filter(m => m !== model)
-        : [...newFilter.models, model];
-      setNewFilter({ ...newFilter, models: updatedModels });
-
-      if (!newFilter.models.includes(model)) {
-        setLoadingDropdowns(true);
-        try {
-          const response = await fetch(
-            `${API_BASE}/years?make=${encodeURIComponent(newFilter.make)}&model=${encodeURIComponent(model)}`
-          );
-          if (response.ok) {
-            const data = await response.json();
-            setAvailableYears(data.years || []);
-          }
-        } catch (error) {
-          console.error('Error fetching years:', error);
-        } finally {
-          setLoadingDropdowns(false);
-        }
-      }
-    }
+  const handleModelToggle = (model: string) => {
+    const updatedModels = newFilter.models.includes(model)
+      ? newFilter.models.filter(m => m !== model)
+      : [...newFilter.models, model];
+    setNewFilter({ ...newFilter, models: updatedModels });
   };
 
   const fetchFilters = async (token: string) => {
@@ -164,18 +147,19 @@ export default function DealerFilters() {
   const handleCreateFilter = async () => {
     const token = localStorage.getItem('dealer_token');
 
-    if (!newFilter.make) {
-      alert('❌ Please select a make');
+    if (!newFilter.name.trim()) {
+      alert('❌ Please give your filter a name');
       return;
     }
 
-    if (newFilter.models.length === 0) {
-      alert('❌ Please select at least one model');
+    if (newFilter.makes.length === 0) {
+      alert('❌ Please select at least one make');
       return;
     }
 
     const payload = {
-      makes: [newFilter.make],
+      name: newFilter.name,
+      makes: newFilter.makes,
       models: newFilter.models,
       year_min: newFilter.year_min ? parseInt(newFilter.year_min) : null,
       year_max: newFilter.year_max ? parseInt(newFilter.year_max) : null,
@@ -204,9 +188,10 @@ export default function DealerFilters() {
       if (response.ok) {
         alert('✅ Filter created successfully!');
         setShowAddForm(false);
-        // fetchFilters(token!);
+        // Reset form for next filter
         setNewFilter({
-          make: '',
+          name: '',
+          makes: [],
           models: [],
           year_min: '',
           year_max: '',
@@ -222,7 +207,6 @@ export default function DealerFilters() {
           carscom: false,
         });
         setAvailableModels([]);
-        setAvailableYears([]);
         setMakeSearchInput('');
         setModelSearchInput('');
       }
@@ -323,11 +307,24 @@ export default function DealerFilters() {
           <div style={{ backgroundColor: 'white', padding: '30px', borderRadius: '8px', border: '1px solid #e5e7eb', marginBottom: '30px' }}>
             <h2 style={{ marginTop: 0, marginBottom: '25px', fontSize: '18px', fontWeight: '700' }}>Create New Filter</h2>
 
+            {/* Filter Name */}
+            <div style={{ marginBottom: '25px' }}>
+              <label style={labelStyle}>Filter Name</label>
+              <input
+                type="text"
+                value={newFilter.name}
+                onChange={(e) => setNewFilter({ ...newFilter, name: e.target.value })}
+                placeholder="e.g., Toyota & Honda SUVs"
+                style={inputStyle}
+              />
+            </div>
+
             <div style={{ marginBottom: '25px' }}>
               <h3 style={{ fontSize: '15px', fontWeight: '600', marginBottom: '15px', color: '#111827' }}>Vehicle Selection</h3>
               
+              {/* Makes Selection */}
               <div style={{ marginBottom: '15px' }}>
-                <label style={labelStyle}>Make</label>
+                <label style={labelStyle}>Makes (select one or more)</label>
                 <div style={dropdownContainerStyle}>
                   <input
                     type="text"
@@ -343,15 +340,25 @@ export default function DealerFilters() {
                     <div style={dropdownListStyle}>
                       {filteredMakes.length > 0 ? (
                         filteredMakes.map((make) => (
-                          <div
+                          <label
                             key={make}
-                            onMouseDown={() => handleMakeChange(make)}
                             onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f3f4f6')}
                             onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'white')}
-                            style={dropdownItemStyle}
+                            style={{
+                              ...dropdownItemStyle,
+                              display: 'flex',
+                              alignItems: 'center',
+                              cursor: 'pointer',
+                            }}
                           >
-                            {make}
-                          </div>
+                            <input
+                              type="checkbox"
+                              checked={newFilter.makes.includes(make)}
+                              onChange={() => handleMakeToggle(make)}
+                              style={{ marginRight: '8px', cursor: 'pointer' }}
+                            />
+                            <span>{make}</span>
+                          </label>
                         ))
                       ) : (
                         <div style={{ ...dropdownItemStyle, color: '#9ca3af' }}>
@@ -361,11 +368,49 @@ export default function DealerFilters() {
                     </div>
                   )}
                 </div>
+
+                {/* Selected Makes */}
+                {newFilter.makes.length > 0 && (
+                  <div style={{ marginTop: '10px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    {newFilter.makes.map((make) => (
+                      <span
+                        key={make}
+                        style={{
+                          padding: '6px 12px',
+                          backgroundColor: '#dbeafe',
+                          color: '#1e40af',
+                          borderRadius: '12px',
+                          fontSize: '13px',
+                          fontWeight: '500',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                        }}
+                      >
+                        {make}
+                        <button
+                          onClick={() => handleMakeToggle(make)}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            fontSize: '16px',
+                            padding: 0,
+                            color: '#1e40af',
+                          }}
+                        >
+                          ✕
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
 
+              {/* Models Selection (Optional) */}
               <div style={{ marginBottom: '15px' }}>
-                <label style={labelStyle}>Models (select one or more)</label>
-                {newFilter.make ? (
+                <label style={labelStyle}>Models (optional - leave empty for all models)</label>
+                {newFilter.makes.length > 0 ? (
                   loadingDropdowns ? (
                     <div style={{ padding: '10px', color: '#6b7280' }}>Loading models...</div>
                   ) : (
@@ -399,10 +444,10 @@ export default function DealerFilters() {
                                   <input
                                     type="checkbox"
                                     checked={newFilter.models.includes(model)}
-                                    onChange={() => handleModelChange(model, true)}
+                                    onChange={() => handleModelToggle(model)}
                                     style={{ marginRight: '8px', cursor: 'pointer' }}
                                   />
-                                  <span style={{ fontSize: '14px' }}>{model}</span>
+                                  <span>{model}</span>
                                 </label>
                               ))
                             ) : (
@@ -414,6 +459,7 @@ export default function DealerFilters() {
                         )}
                       </div>
 
+                      {/* Selected Models */}
                       {newFilter.models.length > 0 && (
                         <div style={{ marginTop: '10px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                           {newFilter.models.map((model) => (
@@ -433,7 +479,7 @@ export default function DealerFilters() {
                             >
                               {model}
                               <button
-                                onClick={() => handleModelChange(model, true)}
+                                onClick={() => handleModelToggle(model)}
                                 style={{
                                   background: 'none',
                                   border: 'none',
@@ -595,21 +641,38 @@ export default function DealerFilters() {
               </div>
             </div>
 
-            <button
-              onClick={handleCreateFilter}
-              style={{
-                padding: '12px 30px',
-                backgroundColor: '#2563eb',
-                color: 'white',
-                border: 'none',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                fontWeight: '600',
-                fontSize: '15px',
-              }}
-            >
-              Create Filter
-            </button>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button
+                onClick={handleCreateFilter}
+                style={{
+                  padding: '12px 30px',
+                  backgroundColor: '#2563eb',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontWeight: '600',
+                  fontSize: '15px',
+                }}
+              >
+                Create Filter
+              </button>
+              <button
+                onClick={() => setShowAddForm(false)}
+                style={{
+                  padding: '12px 30px',
+                  backgroundColor: '#e5e7eb',
+                  color: '#374151',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontWeight: '600',
+                  fontSize: '15px',
+                }}
+              >
+                Cancel
+              </button>
+            </div>
           </div>
         )}
 
@@ -647,8 +710,10 @@ export default function DealerFilters() {
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '15px' }}>
-                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                  <div>
+                    <h3 style={{ margin: '0 0 5px 0', fontSize: '16px', fontWeight: '700' }}>{filter.name}</h3>
                     <span style={{
+                      display: 'inline-block',
                       padding: '4px 10px',
                       backgroundColor: filter.is_active ? '#d1fae5' : '#fee2e2',
                       color: filter.is_active ? '#065f46' : '#991b1b',
