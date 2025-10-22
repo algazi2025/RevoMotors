@@ -66,7 +66,7 @@ export default function DealerFilters() {
     }
     
     fetchMakes();
-    // fetchFilters(token);  // COMMENTED OUT - TESTING
+     fetchFilters(token);  // COMMENTED OUT - TESTING
   }, []);
 
   const fetchMakes = async () => {
