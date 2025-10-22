@@ -91,12 +91,12 @@ async def startup_event():
         logger.warning(f"Car database already initialized: {e}")
     
     # Seed car data
-    try:
-        from app.migrate_data import seed_database
-        seed_database()
-        logger.info("✅ Car database seeded!")
-    except Exception as e:
-        logger.info(f"Car database already seeded or error: {e}")
+   # try:
+    #    from app.migrate_data import seed_database
+     #   seed_database()
+      #  logger.info("✅ Car database seeded!")
+    #except Exception as e:
+     #   logger.info(f"Car database already seeded or error: {e}")
     
     logger.info("🚀 RevoMotors API is ready!")
 
