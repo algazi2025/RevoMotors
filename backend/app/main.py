@@ -89,12 +89,12 @@ async def startup_event():
     except Exception as e:
         logger.warning(f"Car database already initialized: {e}")
     
-    # Add missing columns to dealer_profiles table
-    logger.info("Verifying dealer_profiles columns...")
+    # Add missing columns to all tables
+    logger.info("Verifying database columns...")
     try:
         db = SessionLocal()
         
-        # Add all missing columns
+        # Add missing columns to dealer_profiles table
         db.execute(text("""
             ALTER TABLE dealer_profiles 
             ADD COLUMN IF NOT EXISTS license_number VARCHAR(100),
@@ -111,9 +111,87 @@ async def startup_event():
             ADD COLUMN IF NOT EXISTS followup_day_7 BOOLEAN DEFAULT true
         """))
         
+        # Add missing columns to leads table (AI capabilities)
+        db.execute(text("""
+            ALTER TABLE leads 
+            ADD COLUMN IF NOT EXISTS ai_estimated_value FLOAT,
+            ADD COLUMN IF NOT EXISTS ai_offer_low FLOAT,
+            ADD COLUMN IF NOT EXISTS ai_offer_fair FLOAT,
+            ADD COLUMN IF NOT EXISTS ai_offer_high FLOAT,
+            ADD COLUMN IF NOT EXISTS ai_rationale TEXT
+        """))
+        
+        # Add missing columns to car_listings table
+        db.execute(text("""
+            ALTER TABLE car_listings 
+            ADD COLUMN IF NOT EXISTS photos JSON,
+            ADD COLUMN IF NOT EXISTS external_url TEXT,
+            ADD COLUMN IF NOT EXISTS external_listing_id VARCHAR(255),
+            ADD COLUMN IF NOT EXISTS description TEXT,
+            ADD COLUMN IF NOT EXISTS seller_phone VARCHAR(50),
+            ADD COLUMN IF NOT EXISTS seller_email VARCHAR(255),
+            ADD COLUMN IF NOT EXISTS seller_name VARCHAR(255),
+            ADD COLUMN IF NOT EXISTS source VARCHAR(50),
+            ADD COLUMN IF NOT EXISTS zip_code VARCHAR(20),
+            ADD COLUMN IF NOT EXISTS state VARCHAR(50),
+            ADD COLUMN IF NOT EXISTS city VARCHAR(100),
+            ADD COLUMN IF NOT EXISTS region VARCHAR(100),
+            ADD COLUMN IF NOT EXISTS fuel_type VARCHAR(50),
+            ADD COLUMN IF NOT EXISTS transmission VARCHAR(50),
+            ADD COLUMN IF NOT EXISTS color VARCHAR(50),
+            ADD COLUMN IF NOT EXISTS vin VARCHAR(17),
+            ADD COLUMN IF NOT EXISTS condition VARCHAR(50),
+            ADD COLUMN IF NOT EXISTS mileage INTEGER,
+            ADD COLUMN IF NOT EXISTS trim VARCHAR(100),
+            ADD COLUMN IF NOT EXISTS model VARCHAR(100),
+            ADD COLUMN IF NOT EXISTS make VARCHAR(100),
+            ADD COLUMN IF NOT EXISTS year INTEGER,
+            ADD COLUMN IF NOT EXISTS title VARCHAR(255),
+            ADD COLUMN IF NOT EXISTS asking_price FLOAT
+        """))
+        
+        # Add missing columns to messages table
+        db.execute(text("""
+            ALTER TABLE messages 
+            ADD COLUMN IF NOT EXISTS channel VARCHAR(50),
+            ADD COLUMN IF NOT EXISTS seller_replied BOOLEAN DEFAULT false,
+            ADD COLUMN IF NOT EXISTS read_by_seller BOOLEAN DEFAULT false,
+            ADD COLUMN IF NOT EXISTS sent_at TIMESTAMP,
+            ADD COLUMN IF NOT EXISTS sent BOOLEAN DEFAULT false,
+            ADD COLUMN IF NOT EXISTS modified_by_dealer BOOLEAN DEFAULT false,
+            ADD COLUMN IF NOT EXISTS generated_by_ai BOOLEAN DEFAULT true,
+            ADD COLUMN IF NOT EXISTS body TEXT,
+            ADD COLUMN IF NOT EXISTS subject VARCHAR(500),
+            ADD COLUMN IF NOT EXISTS message_type VARCHAR(50)
+        """))
+        
+        # Add missing columns to offers table
+        db.execute(text("""
+            ALTER TABLE offers 
+            ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'pending',
+            ADD COLUMN IF NOT EXISTS amount DECIMAL(10, 2)
+        """))
+        
+        # Add missing columns to dealer_documents table
+        db.execute(text("""
+            ALTER TABLE dealer_documents 
+            ADD COLUMN IF NOT EXISTS uploaded_at TIMESTAMP,
+            ADD COLUMN IF NOT EXISTS verified BOOLEAN DEFAULT false,
+            ADD COLUMN IF NOT EXISTS expires_at DATE,
+            ADD COLUMN IF NOT EXISTS file_url TEXT,
+            ADD COLUMN IF NOT EXISTS document_name VARCHAR(255),
+            ADD COLUMN IF NOT EXISTS document_type VARCHAR(100)
+        """))
+        
+        # Add missing columns to seller_profiles table
+        db.execute(text("""
+            ALTER TABLE seller_profiles 
+            ADD COLUMN IF NOT EXISTS phone VARCHAR(50)
+        """))
+        
         db.commit()
         db.close()
-        logger.info("✅ Dealer profile columns verified!")
+        logger.info("✅ All table columns verified!")
     except Exception as e:
         logger.warning(f"Column verification: {e}")
     
