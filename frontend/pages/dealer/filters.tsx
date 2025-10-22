@@ -53,6 +53,12 @@ export default function DealerFilters() {
   const [availableModels, setAvailableModels] = useState<string[]>([]);
   const [availableYears, setAvailableYears] = useState<number[]>([]);
   const [loadingDropdowns, setLoadingDropdowns] = useState(false);
+  
+  // Search/filter states for searchable dropdowns
+  const [makeSearchInput, setMakeSearchInput] = useState('');
+  const [modelSearchInput, setModelSearchInput] = useState('');
+  const [showMakeDropdown, setShowMakeDropdown] = useState(false);
+  const [showModelDropdown, setShowModelDropdown] = useState(false);
 
   // Fetch all makes on component mount
   useEffect(() => {
@@ -79,6 +85,16 @@ export default function DealerFilters() {
     }
   };
 
+  // Filter makes based on search input
+  const filteredMakes = allMakes.filter(make =>
+    make.toLowerCase().includes(makeSearchInput.toLowerCase())
+  );
+
+  // Filter models based on search input
+  const filteredModels = availableModels.filter(model =>
+    model.toLowerCase().includes(modelSearchInput.toLowerCase())
+  );
+
   // Fetch models when make is selected
   const handleMakeChange = async (make: string) => {
     setNewFilter({
@@ -88,8 +104,11 @@ export default function DealerFilters() {
       year_min: '',
       year_max: '',
     });
+    setMakeSearchInput(make);
+    setShowMakeDropdown(false);
     setAvailableModels([]);
     setAvailableYears([]);
+    setModelSearchInput('');
 
     if (!make) return;
 
@@ -215,6 +234,8 @@ export default function DealerFilters() {
         });
         setAvailableModels([]);
         setAvailableYears([]);
+        setMakeSearchInput('');
+        setModelSearchInput('');
       }
     } catch (error) {
       console.error('Error creating filter:', error);
@@ -257,10 +278,31 @@ export default function DealerFilters() {
     color: '#374151',
   };
 
-  const selectStyle = {
-    ...inputStyle,
-    cursor: 'pointer',
+  const dropdownContainerStyle = {
+    position: 'relative' as const,
+    width: '100%',
+  };
+
+  const dropdownListStyle = {
+    position: 'absolute' as const,
+    top: '100%',
+    left: 0,
+    right: 0,
+    border: '1px solid #d1d5db',
+    borderRadius: '6px',
     backgroundColor: 'white',
+    maxHeight: '250px',
+    overflowY: 'auto' as const,
+    zIndex: 1000,
+    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+  };
+
+  const dropdownItemStyle = {
+    padding: '10px 15px',
+    cursor: 'pointer',
+    borderBottom: '1px solid #f3f4f6',
+    fontSize: '14px',
+    transition: 'background-color 0.2s',
   };
 
   return (
@@ -299,43 +341,133 @@ export default function DealerFilters() {
             <div style={{ marginBottom: '25px' }}>
               <h3 style={{ fontSize: '15px', fontWeight: '600', marginBottom: '15px', color: '#111827' }}>Vehicle Selection</h3>
               
-              {/* Make Dropdown */}
+              {/* Make Searchable Dropdown */}
               <div style={{ marginBottom: '15px' }}>
                 <label style={labelStyle}>Make</label>
-                <select
-                  value={newFilter.make}
-                  onChange={(e) => handleMakeChange(e.target.value)}
-                  style={selectStyle}
-                >
-                  <option value="">-- Select Make --</option>
-                  {allMakes.map((make) => (
-                    <option key={make} value={make}>
-                      {make}
-                    </option>
-                  ))}
-                </select>
+                <div style={dropdownContainerStyle}>
+                  <input
+                    type="text"
+                    placeholder="Type to search makes..."
+                    value={makeSearchInput}
+                    onChange={(e) => setMakeSearchInput(e.target.value)}
+                    onFocus={() => setShowMakeDropdown(true)}
+                    onBlur={() => setTimeout(() => setShowMakeDropdown(false), 200)}
+                    style={inputStyle}
+                  />
+                  
+                  {showMakeDropdown && (
+                    <div style={dropdownListStyle}>
+                      {filteredMakes.length > 0 ? (
+                        filteredMakes.map((make) => (
+                          <div
+                            key={make}
+                            onMouseDown={() => handleMakeChange(make)}
+                            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f3f4f6')}
+                            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'white')}
+                            style={dropdownItemStyle}
+                          >
+                            {make}
+                          </div>
+                        ))
+                      ) : (
+                        <div style={{ ...dropdownItemStyle, color: '#9ca3af' }}>
+                          No makes found
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
 
-              {/* Model Dropdown */}
+              {/* Model Searchable Dropdown */}
               <div style={{ marginBottom: '15px' }}>
                 <label style={labelStyle}>Models (select one or more)</label>
                 {newFilter.make ? (
                   loadingDropdowns ? (
                     <div style={{ padding: '10px', color: '#6b7280' }}>Loading models...</div>
                   ) : (
-                    <div style={{ border: '1px solid #d1d5db', borderRadius: '6px', padding: '10px', maxHeight: '200px', overflowY: 'auto', backgroundColor: '#f9fafb' }}>
-                      {availableModels.map((model) => (
-                        <label key={model} style={{ display: 'flex', alignItems: 'center', padding: '8px', cursor: 'pointer', marginBottom: '4px' }}>
-                          <input
-                            type="checkbox"
-                            checked={newFilter.models.includes(model)}
-                            onChange={() => handleModelChange(model, true)}
-                            style={{ marginRight: '8px', cursor: 'pointer' }}
-                          />
-                          <span style={{ fontSize: '14px' }}>{model}</span>
-                        </label>
-                      ))}
-                    </div>
+                    <>
+                      <div style={dropdownContainerStyle}>
+                        <input
+                          type="text"
+                          placeholder="Type to search models..."
+                          value={modelSearchInput}
+                          onChange={(e) => setModelSearchInput(e.target.value)}
+                          onFocus={() => setShowModelDropdown(true)}
+                          onBlur={() => setTimeout(() => setShowModelDropdown(false), 200)}
+                          style={inputStyle}
+                        />
+                        
+                        {showModelDropdown && (
+                          <div style={dropdownListStyle}>
+                            {filteredModels.length > 0 ? (
+                              filteredModels.map((model) => (
+                                <label
+                                  key={model}
+                                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f3f4f6')}
+                                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'white')}
+                                  style={{
+                                    ...dropdownItemStyle,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    cursor: 'pointer',
+                                  }}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={newFilter.models.includes(model)}
+                                    onChange={() => handleModelChange(model, true)}
+                                    style={{ marginRight: '8px', cursor: 'pointer' }}
+                                  />
+                                  <span style={{ fontSize: '14px' }}>{model}</span>
+                                </label>
+                              ))
+                            ) : (
+                              <div style={{ ...dropdownItemStyle, color: '#9ca3af' }}>
+                                No models found
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Show selected models */}
+                      {newFilter.models.length > 0 && (
+                        <div style={{ marginTop: '10px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                          {newFilter.models.map((model) => (
+                            <span
+                              key={model}
+                              style={{
+                                padding: '6px 12px',
+                                backgroundColor: '#dbeafe',
+                                color: '#1e40af',
+                                borderRadius: '12px',
+                                fontSize: '13px',
+                                fontWeight: '500',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                              }}
+                            >
+                              {model}
+                              <button
+                                onClick={() => handleModelChange(model, true)}
+                                style={{
+                                  background: 'none',
+                                  border: 'none',
+                                  cursor: 'pointer',
+                                  fontSize: '16px',
+                                  padding: 0,
+                                  color: '#1e40af',
+                                }}
+                              >
+                                ✕
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </>
                   )
                 ) : (
                   <div style={{ padding: '10px', color: '#9ca3af', fontSize: '14px' }}>Select a make first</div>
@@ -618,7 +750,7 @@ export default function DealerFilters() {
                     {filter.marketplaces.offerup && <span style={{ padding: '4px 10px', backgroundColor: '#dbeafe', color: '#1e40af', borderRadius: '12px', fontSize: '12px' }}>OfferUp</span>}
                     {filter.marketplaces.craigslist && <span style={{ padding: '4px 10px', backgroundColor: '#dbeafe', color: '#1e40af', borderRadius: '12px', fontSize: '12px' }}>Craigslist</span>}
                     {filter.marketplaces.autotrader && <span style={{ padding: '4px 10px', backgroundColor: '#dbeafe', color: '#1e40af', borderRadius: '12px', fontSize: '12px' }}>AutoTrader</span>}
-                    {filter.marketplaces.carscom && <span style={{ padding: '4px 10px', backgroundColor: '#dbeafe', color: '#1e40af', borderRadius: '12px', fontSize: '12px' }}>Cars.com</span>}
+                    {filter.marketplaces.carscom && <span style={{ padding: '4px 10px', backgroundColor: '#dbeafe', color: '#1e40af', borderRadius: '#12px', fontSize: '12px' }}>Cars.com</span>}
                   </div>
                 </div>
               </div>
