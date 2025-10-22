@@ -25,13 +25,15 @@ interface Filter {
   is_active: boolean;
 }
 
+const API_BASE = 'https://revomotors.onrender.com/api/cars';
+
 export default function DealerFilters() {
   const [filters, setFilters] = useState<Filter[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
   const [newFilter, setNewFilter] = useState({
-    makes: '',
-    models: '',
+    make: '',
+    models: [] as string[],
     year_min: '',
     year_max: '',
     mileage_max: '',
@@ -50,17 +52,89 @@ export default function DealerFilters() {
   const [allMakes, setAllMakes] = useState<string[]>([]);
   const [availableModels, setAvailableModels] = useState<string[]>([]);
   const [availableYears, setAvailableYears] = useState<number[]>([]);
-  const [selectedMakes, setSelectedMakes] = useState<string[]>([]);
-  const [selectedModels, setSelectedModels] = useState<string[]>([]);
+  const [loadingDropdowns, setLoadingDropdowns] = useState(false);
 
+  // Fetch all makes on component mount
   useEffect(() => {
     const token = localStorage.getItem('dealer_token');
     if (!token) {
       window.location.href = '/dealer/login';
       return;
     }
+    
+    fetchMakes();
     fetchFilters(token);
   }, []);
+
+  // Fetch makes from car database API
+  const fetchMakes = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/makes`);
+      if (response.ok) {
+        const data = await response.json();
+        setAllMakes(data.makes || []);
+      }
+    } catch (error) {
+      console.error('Error fetching makes:', error);
+    }
+  };
+
+  // Fetch models when make is selected
+  const handleMakeChange = async (make: string) => {
+    setNewFilter({
+      ...newFilter,
+      make,
+      models: [],
+      year_min: '',
+      year_max: '',
+    });
+    setAvailableModels([]);
+    setAvailableYears([]);
+
+    if (!make) return;
+
+    setLoadingDropdowns(true);
+    try {
+      const response = await fetch(`${API_BASE}/models?make=${encodeURIComponent(make)}`);
+      if (response.ok) {
+        const data = await response.json();
+        setAvailableModels(data.models || []);
+      }
+    } catch (error) {
+      console.error('Error fetching models:', error);
+    } finally {
+      setLoadingDropdowns(false);
+    }
+  };
+
+  // Fetch years when model is selected
+  const handleModelChange = async (model: string, isAdd: boolean) => {
+    if (isAdd) {
+      // For adding multiple models
+      const updatedModels = newFilter.models.includes(model)
+        ? newFilter.models.filter(m => m !== model)
+        : [...newFilter.models, model];
+      setNewFilter({ ...newFilter, models: updatedModels });
+
+      // Fetch years for this model if adding
+      if (!newFilter.models.includes(model)) {
+        setLoadingDropdowns(true);
+        try {
+          const response = await fetch(
+            `${API_BASE}/years?make=${encodeURIComponent(newFilter.make)}&model=${encodeURIComponent(model)}`
+          );
+          if (response.ok) {
+            const data = await response.json();
+            setAvailableYears(data.years || []);
+          }
+        } catch (error) {
+          console.error('Error fetching years:', error);
+        } finally {
+          setLoadingDropdowns(false);
+        }
+      }
+    }
+  };
 
   const fetchFilters = async (token: string) => {
     try {
@@ -80,10 +154,20 @@ export default function DealerFilters() {
 
   const handleCreateFilter = async () => {
     const token = localStorage.getItem('dealer_token');
-    
+
+    if (!newFilter.make) {
+      alert('❌ Please select a make');
+      return;
+    }
+
+    if (newFilter.models.length === 0) {
+      alert('❌ Please select at least one model');
+      return;
+    }
+
     const payload = {
-      makes: newFilter.makes ? newFilter.makes.split(',').map(m => m.trim()) : [],
-      models: newFilter.models ? newFilter.models.split(',').map(m => m.trim()) : [],
+      makes: [newFilter.make],
+      models: newFilter.models,
       year_min: newFilter.year_min ? parseInt(newFilter.year_min) : null,
       year_max: newFilter.year_max ? parseInt(newFilter.year_max) : null,
       mileage_max: newFilter.mileage_max ? parseInt(newFilter.mileage_max) : null,
@@ -114,14 +198,27 @@ export default function DealerFilters() {
         fetchFilters(token!);
         // Reset form
         setNewFilter({
-          makes: '', models: '', year_min: '', year_max: '', mileage_max: '',
-          price_min: '', price_max: '', zip_codes: '', radius_miles: 50,
-          facebook: true, offerup: true, craigslist: true, autotrader: false, carscom: false,
+          make: '',
+          models: [],
+          year_min: '',
+          year_max: '',
+          mileage_max: '',
+          price_min: '',
+          price_max: '',
+          zip_codes: '',
+          radius_miles: 50,
+          facebook: true,
+          offerup: true,
+          craigslist: true,
+          autotrader: false,
+          carscom: false,
         });
+        setAvailableModels([]);
+        setAvailableYears([]);
       }
     } catch (error) {
       console.error('Error creating filter:', error);
-      alert('Error creating filter');
+      alert('❌ Error creating filter');
     }
   };
 
@@ -160,6 +257,12 @@ export default function DealerFilters() {
     color: '#374151',
   };
 
+  const selectStyle = {
+    ...inputStyle,
+    cursor: 'pointer',
+    backgroundColor: 'white',
+  };
+
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f9fafb', fontFamily: 'system-ui' }}>
       {/* Header */}
@@ -187,133 +290,153 @@ export default function DealerFilters() {
       </header>
 
       <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '30px 20px' }}>
-        <div style={{ marginBottom: '20px' }}>
-          <h1 style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '8px' }}>Marketplace Filters</h1>
-          <p style={{ color: '#6b7280', fontSize: '15px' }}>
-            Set up filters to automatically receive leads from marketplaces when new cars matching your criteria are listed.
-          </p>
-        </div>
-
-        {/* Info Box */}
-        <div style={{ backgroundColor: '#eff6ff', padding: '15px', borderRadius: '8px', marginBottom: '25px', fontSize: '14px', color: '#1e40af' }}>
-          <strong>🤖 AI Auto-Detection:</strong> Our AI scans Facebook Marketplace, OfferUp, Craigslist, and other platforms 24/7. When a car matching your filters is listed, you'll get a lead with an AI-generated message ready to send!
-        </div>
-
         {/* Add Filter Form */}
         {showAddForm && (
-          <div style={{ backgroundColor: 'white', padding: '25px', borderRadius: '8px', border: '1px solid #e5e7eb', marginBottom: '25px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h2 style={{ fontSize: '18px', fontWeight: 'bold' }}>Create New Filter</h2>
-              <button
-                onClick={() => setShowAddForm(false)}
-                style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#6b7280' }}
-              >
-                ✕
-              </button>
-            </div>
+          <div style={{ backgroundColor: 'white', padding: '30px', borderRadius: '8px', border: '1px solid #e5e7eb', marginBottom: '30px' }}>
+            <h2 style={{ marginTop: 0, marginBottom: '25px', fontSize: '18px', fontWeight: '700' }}>Create New Filter</h2>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '15px', marginBottom: '20px' }}>
-              <div>
-                <label style={labelStyle}>Makes (comma-separated)</label>
-                <input
-                  type="text"
-                  value={newFilter.makes}
-                  onChange={(e) => setNewFilter({...newFilter, makes: e.target.value})}
-                  style={inputStyle}
-                  placeholder="Honda, Toyota, Ford"
-                />
+            {/* Vehicle Selection */}
+            <div style={{ marginBottom: '25px' }}>
+              <h3 style={{ fontSize: '15px', fontWeight: '600', marginBottom: '15px', color: '#111827' }}>Vehicle Selection</h3>
+              
+              {/* Make Dropdown */}
+              <div style={{ marginBottom: '15px' }}>
+                <label style={labelStyle}>Make</label>
+                <select
+                  value={newFilter.make}
+                  onChange={(e) => handleMakeChange(e.target.value)}
+                  style={selectStyle}
+                >
+                  <option value="">-- Select Make --</option>
+                  {allMakes.map((make) => (
+                    <option key={make} value={make}>
+                      {make}
+                    </option>
+                  ))}
+                </select>
               </div>
 
-              <div>
-                <label style={labelStyle}>Models (comma-separated)</label>
-                <input
-                  type="text"
-                  value={newFilter.models}
-                  onChange={(e) => setNewFilter({...newFilter, models: e.target.value})}
-                  style={inputStyle}
-                  placeholder="Civic, Camry, F-150"
-                />
+              {/* Model Dropdown */}
+              <div style={{ marginBottom: '15px' }}>
+                <label style={labelStyle}>Models (select one or more)</label>
+                {newFilter.make ? (
+                  loadingDropdowns ? (
+                    <div style={{ padding: '10px', color: '#6b7280' }}>Loading models...</div>
+                  ) : (
+                    <div style={{ border: '1px solid #d1d5db', borderRadius: '6px', padding: '10px', maxHeight: '200px', overflowY: 'auto', backgroundColor: '#f9fafb' }}>
+                      {availableModels.map((model) => (
+                        <label key={model} style={{ display: 'flex', alignItems: 'center', padding: '8px', cursor: 'pointer', marginBottom: '4px' }}>
+                          <input
+                            type="checkbox"
+                            checked={newFilter.models.includes(model)}
+                            onChange={() => handleModelChange(model, true)}
+                            style={{ marginRight: '8px', cursor: 'pointer' }}
+                          />
+                          <span style={{ fontSize: '14px' }}>{model}</span>
+                        </label>
+                      ))}
+                    </div>
+                  )
+                ) : (
+                  <div style={{ padding: '10px', color: '#9ca3af', fontSize: '14px' }}>Select a make first</div>
+                )}
               </div>
 
-              <div>
-                <label style={labelStyle}>Year Min</label>
-                <input
-                  type="number"
-                  value={newFilter.year_min}
-                  onChange={(e) => setNewFilter({...newFilter, year_min: e.target.value})}
-                  style={inputStyle}
-                  placeholder="2015"
-                />
-              </div>
-
-              <div>
-                <label style={labelStyle}>Year Max</label>
-                <input
-                  type="number"
-                  value={newFilter.year_max}
-                  onChange={(e) => setNewFilter({...newFilter, year_max: e.target.value})}
-                  style={inputStyle}
-                  placeholder="2023"
-                />
-              </div>
-
-              <div>
-                <label style={labelStyle}>Max Mileage</label>
-                <input
-                  type="number"
-                  value={newFilter.mileage_max}
-                  onChange={(e) => setNewFilter({...newFilter, mileage_max: e.target.value})}
-                  style={inputStyle}
-                  placeholder="100000"
-                />
-              </div>
-
-              <div>
-                <label style={labelStyle}>Price Range</label>
-                <div style={{ display: 'flex', gap: '10px' }}>
+              {/* Year Range */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '15px' }}>
+                <div>
+                  <label style={labelStyle}>Year Min</label>
                   <input
                     type="number"
-                    value={newFilter.price_min}
-                    onChange={(e) => setNewFilter({...newFilter, price_min: e.target.value})}
+                    value={newFilter.year_min}
+                    onChange={(e) => setNewFilter({ ...newFilter, year_min: e.target.value })}
+                    placeholder="e.g. 2015"
                     style={inputStyle}
-                    placeholder="Min $"
                   />
+                </div>
+                <div>
+                  <label style={labelStyle}>Year Max</label>
                   <input
                     type="number"
-                    value={newFilter.price_max}
-                    onChange={(e) => setNewFilter({...newFilter, price_max: e.target.value})}
+                    value={newFilter.year_max}
+                    onChange={(e) => setNewFilter({ ...newFilter, year_max: e.target.value })}
+                    placeholder="e.g. 2025"
                     style={inputStyle}
-                    placeholder="Max $"
                   />
                 </div>
               </div>
+            </div>
 
-              <div>
-                <label style={labelStyle}>ZIP Codes (comma-separated)</label>
-                <input
-                  type="text"
-                  value={newFilter.zip_codes}
-                  onChange={(e) => setNewFilter({...newFilter, zip_codes: e.target.value})}
-                  style={inputStyle}
-                  placeholder="90210, 10001"
-                />
-              </div>
-
-              <div>
-                <label style={labelStyle}>Search Radius (miles)</label>
-                <input
-                  type="number"
-                  value={newFilter.radius_miles}
-                  onChange={(e) => setNewFilter({...newFilter, radius_miles: parseInt(e.target.value)})}
-                  style={inputStyle}
-                  placeholder="50"
-                />
+            {/* Price & Mileage Filters */}
+            <div style={{ marginBottom: '25px' }}>
+              <h3 style={{ fontSize: '15px', fontWeight: '600', marginBottom: '15px', color: '#111827' }}>Price & Mileage</h3>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '15px', marginBottom: '15px' }}>
+                <div>
+                  <label style={labelStyle}>Price Min ($)</label>
+                  <input
+                    type="number"
+                    value={newFilter.price_min}
+                    onChange={(e) => setNewFilter({ ...newFilter, price_min: e.target.value })}
+                    placeholder="0"
+                    style={inputStyle}
+                  />
+                </div>
+                <div>
+                  <label style={labelStyle}>Price Max ($)</label>
+                  <input
+                    type="number"
+                    value={newFilter.price_max}
+                    onChange={(e) => setNewFilter({ ...newFilter, price_max: e.target.value })}
+                    placeholder="100000"
+                    style={inputStyle}
+                  />
+                </div>
+                <div>
+                  <label style={labelStyle}>Max Mileage (mi)</label>
+                  <input
+                    type="number"
+                    value={newFilter.mileage_max}
+                    onChange={(e) => setNewFilter({ ...newFilter, mileage_max: e.target.value })}
+                    placeholder="200000"
+                    style={inputStyle}
+                  />
+                </div>
               </div>
             </div>
 
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{ ...labelStyle, marginBottom: '12px' }}>Marketplaces to Monitor</label>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
+            {/* Location Filter */}
+            <div style={{ marginBottom: '25px' }}>
+              <h3 style={{ fontSize: '15px', fontWeight: '600', marginBottom: '15px', color: '#111827' }}>Location</h3>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '15px' }}>
+                <div>
+                  <label style={labelStyle}>Zip Codes (comma separated)</label>
+                  <input
+                    type="text"
+                    value={newFilter.zip_codes}
+                    onChange={(e) => setNewFilter({ ...newFilter, zip_codes: e.target.value })}
+                    placeholder="90210, 10001, 60601"
+                    style={inputStyle}
+                  />
+                </div>
+                <div>
+                  <label style={labelStyle}>Radius (miles)</label>
+                  <input
+                    type="number"
+                    value={newFilter.radius_miles}
+                    onChange={(e) => setNewFilter({ ...newFilter, radius_miles: parseInt(e.target.value) || 50 })}
+                    style={inputStyle}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Marketplace Selection */}
+            <div style={{ marginBottom: '25px' }}>
+              <h3 style={{ fontSize: '15px', fontWeight: '600', marginBottom: '15px', color: '#111827' }}>Monitor Marketplaces</h3>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
                 <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', padding: '10px', backgroundColor: '#f9fafb', borderRadius: '6px' }}>
                   <input
                     type="checkbox"
