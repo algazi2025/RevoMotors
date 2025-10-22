@@ -43,7 +43,6 @@ class DealerProfile(Base):
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True)
     company_name = Column(String(255), nullable=False)
-    dealership_name = Column(String(255))
     license_number = Column(String(100))
     phone = Column(String(50))
     address = Column(Text)
