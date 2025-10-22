@@ -3,7 +3,7 @@ Database configuration and models for car data
 Uses PostgreSQL with SQLAlchemy ORM
 """
 
-from sqlalchemy import create_engine, Column, Integer, String, ForeignKey, Table, Boolean
+from sqlalchemy import create_engine, Column, Integer, String, ForeignKey, Table, Boolean, UniqueConstraint
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 import os
