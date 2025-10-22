@@ -7,8 +7,7 @@ Supports: Makes, Models, Trims, Years, Body Types, etc.
 from fastapi import APIRouter, Query, Depends
 from sqlalchemy.orm import Session
 from typing import List
-from database import get_db, Make, Model, Trim, BodyType, Transmission, FuelType
-
+from app.database import get_db, Make, Model, Trim, BodyType, Transmission, FuelType
 router = APIRouter()
 
 
