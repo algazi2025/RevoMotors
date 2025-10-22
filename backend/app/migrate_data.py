@@ -5,7 +5,7 @@ Run this once to populate the database
 """
 
 from sqlalchemy import text
-from database import SessionLocal, init_db, Make, Model, Trim, BodyType, Transmission, FuelType
+from app.database import SessionLocal, init_db, Make, Model, Trim, BodyType, Transmission, FuelType
 
 # COMPREHENSIVE car database with ALL major makes and models (42 makes)
 CAR_DATABASE = {
