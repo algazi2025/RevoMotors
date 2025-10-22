@@ -48,19 +48,16 @@ export default function DealerFilters() {
     carscom: false,
   });
 
-  // Dropdown data
   const [allMakes, setAllMakes] = useState<string[]>([]);
   const [availableModels, setAvailableModels] = useState<string[]>([]);
   const [availableYears, setAvailableYears] = useState<number[]>([]);
   const [loadingDropdowns, setLoadingDropdowns] = useState(false);
   
-  // Search/filter states for searchable dropdowns
   const [makeSearchInput, setMakeSearchInput] = useState('');
   const [modelSearchInput, setModelSearchInput] = useState('');
   const [showMakeDropdown, setShowMakeDropdown] = useState(false);
   const [showModelDropdown, setShowModelDropdown] = useState(false);
 
-  // Fetch all makes on component mount
   useEffect(() => {
     const token = localStorage.getItem('dealer_token');
     if (!token) {
@@ -69,9 +66,9 @@ export default function DealerFilters() {
     }
     
     fetchMakes();
-// fetchFilters(token);  // COMMENTED OUT - TESTING  }, []);
+    // fetchFilters(token);  // COMMENTED OUT - TESTING
+  }, []);
 
-  // Fetch makes from car database API
   const fetchMakes = async () => {
     try {
       const response = await fetch(`${API_BASE}/makes`);
@@ -84,17 +81,14 @@ export default function DealerFilters() {
     }
   };
 
-  // Filter makes based on search input
   const filteredMakes = allMakes.filter(make =>
     make.toLowerCase().includes(makeSearchInput.toLowerCase())
   );
 
-  // Filter models based on search input
   const filteredModels = availableModels.filter(model =>
     model.toLowerCase().includes(modelSearchInput.toLowerCase())
   );
 
-  // Fetch models when make is selected
   const handleMakeChange = async (make: string) => {
     setNewFilter({
       ...newFilter,
@@ -125,16 +119,13 @@ export default function DealerFilters() {
     }
   };
 
-  // Fetch years when model is selected
   const handleModelChange = async (model: string, isAdd: boolean) => {
     if (isAdd) {
-      // For adding multiple models
       const updatedModels = newFilter.models.includes(model)
         ? newFilter.models.filter(m => m !== model)
         : [...newFilter.models, model];
       setNewFilter({ ...newFilter, models: updatedModels });
 
-      // Fetch years for this model if adding
       if (!newFilter.models.includes(model)) {
         setLoadingDropdowns(true);
         try {
@@ -213,8 +204,7 @@ export default function DealerFilters() {
       if (response.ok) {
         alert('✅ Filter created successfully!');
         setShowAddForm(false);
-        fetchFilters(token!);
-        // Reset form
+        // fetchFilters(token!);
         setNewFilter({
           make: '',
           models: [],
@@ -254,7 +244,7 @@ export default function DealerFilters() {
 
       if (response.ok) {
         alert('✅ Filter deleted');
-        fetchFilters(token!);
+        // fetchFilters(token!);
       }
     } catch (error) {
       console.error('Error deleting filter:', error);
@@ -270,8 +260,8 @@ export default function DealerFilters() {
   };
 
   const labelStyle = {
-    display: 'block',
-    fontWeight: '600',
+    display: 'block' as const,
+    fontWeight: '600' as const,
     marginBottom: '6px',
     fontSize: '13px',
     color: '#374151',
@@ -301,12 +291,10 @@ export default function DealerFilters() {
     cursor: 'pointer',
     borderBottom: '1px solid #f3f4f6',
     fontSize: '14px',
-    transition: 'background-color 0.2s',
   };
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f9fafb', fontFamily: 'system-ui' }}>
-      {/* Header */}
       <header style={{ backgroundColor: 'white', borderBottom: '1px solid #e5e7eb', padding: '15px 0' }}>
         <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <a href="/dealer/dashboard" style={{ color: '#2563eb', textDecoration: 'none', fontSize: '14px', fontWeight: '500' }}>
@@ -331,16 +319,13 @@ export default function DealerFilters() {
       </header>
 
       <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '30px 20px' }}>
-        {/* Add Filter Form */}
         {showAddForm && (
           <div style={{ backgroundColor: 'white', padding: '30px', borderRadius: '8px', border: '1px solid #e5e7eb', marginBottom: '30px' }}>
             <h2 style={{ marginTop: 0, marginBottom: '25px', fontSize: '18px', fontWeight: '700' }}>Create New Filter</h2>
 
-            {/* Vehicle Selection */}
             <div style={{ marginBottom: '25px' }}>
               <h3 style={{ fontSize: '15px', fontWeight: '600', marginBottom: '15px', color: '#111827' }}>Vehicle Selection</h3>
               
-              {/* Make Searchable Dropdown */}
               <div style={{ marginBottom: '15px' }}>
                 <label style={labelStyle}>Make</label>
                 <div style={dropdownContainerStyle}>
@@ -378,7 +363,6 @@ export default function DealerFilters() {
                 </div>
               </div>
 
-              {/* Model Searchable Dropdown */}
               <div style={{ marginBottom: '15px' }}>
                 <label style={labelStyle}>Models (select one or more)</label>
                 {newFilter.make ? (
@@ -430,7 +414,6 @@ export default function DealerFilters() {
                         )}
                       </div>
 
-                      {/* Show selected models */}
                       {newFilter.models.length > 0 && (
                         <div style={{ marginTop: '10px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                           {newFilter.models.map((model) => (
@@ -473,7 +456,6 @@ export default function DealerFilters() {
                 )}
               </div>
 
-              {/* Year Range */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '15px' }}>
                 <div>
                   <label style={labelStyle}>Year Min</label>
@@ -498,7 +480,6 @@ export default function DealerFilters() {
               </div>
             </div>
 
-            {/* Price & Mileage Filters */}
             <div style={{ marginBottom: '25px' }}>
               <h3 style={{ fontSize: '15px', fontWeight: '600', marginBottom: '15px', color: '#111827' }}>Price & Mileage</h3>
               
@@ -536,7 +517,6 @@ export default function DealerFilters() {
               </div>
             </div>
 
-            {/* Location Filter */}
             <div style={{ marginBottom: '25px' }}>
               <h3 style={{ fontSize: '15px', fontWeight: '600', marginBottom: '15px', color: '#111827' }}>Location</h3>
               
@@ -563,7 +543,6 @@ export default function DealerFilters() {
               </div>
             </div>
 
-            {/* Marketplace Selection */}
             <div style={{ marginBottom: '25px' }}>
               <h3 style={{ fontSize: '15px', fontWeight: '600', marginBottom: '15px', color: '#111827' }}>Monitor Marketplaces</h3>
               
@@ -634,7 +613,6 @@ export default function DealerFilters() {
           </div>
         )}
 
-        {/* Filters List */}
         {loading ? (
           <div style={{ textAlign: 'center', padding: '40px', color: '#6b7280' }}>Loading filters...</div>
         ) : filters.length === 0 ? (
@@ -749,7 +727,7 @@ export default function DealerFilters() {
                     {filter.marketplaces.offerup && <span style={{ padding: '4px 10px', backgroundColor: '#dbeafe', color: '#1e40af', borderRadius: '12px', fontSize: '12px' }}>OfferUp</span>}
                     {filter.marketplaces.craigslist && <span style={{ padding: '4px 10px', backgroundColor: '#dbeafe', color: '#1e40af', borderRadius: '12px', fontSize: '12px' }}>Craigslist</span>}
                     {filter.marketplaces.autotrader && <span style={{ padding: '4px 10px', backgroundColor: '#dbeafe', color: '#1e40af', borderRadius: '12px', fontSize: '12px' }}>AutoTrader</span>}
-                    {filter.marketplaces.carscom && <span style={{ padding: '4px 10px', backgroundColor: '#dbeafe', color: '#1e40af', borderRadius: '#12px', fontSize: '12px' }}>Cars.com</span>}
+                    {filter.marketplaces.carscom && <span style={{ padding: '4px 10px', backgroundColor: '#dbeafe', color: '#1e40af', borderRadius: '12px', fontSize: '12px' }}>Cars.com</span>}
                   </div>
                 </div>
               </div>
