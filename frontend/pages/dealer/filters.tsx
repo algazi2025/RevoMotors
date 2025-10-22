@@ -69,8 +69,7 @@ export default function DealerFilters() {
     }
     
     fetchMakes();
-    fetchFilters(token);
-  }, []);
+// fetchFilters(token);  // COMMENTED OUT - TESTING  }, []);
 
   // Fetch makes from car database API
   const fetchMakes = async () => {
