@@ -13,6 +13,8 @@ from app.api.leads import router as leads_router
 from app.api.offers import router as offers_router
 from app.api.messages import router as messages_router
 from app.api.dealers import router as dealers_router
+from app.api.car_database import router as car_database_router
+
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -69,6 +71,8 @@ app.include_router(leads_router, prefix="/api/leads", tags=["leads"])
 app.include_router(offers_router, prefix="/api/offers", tags=["offers"])
 app.include_router(messages_router, prefix="/api/messages", tags=["messages"])
 app.include_router(dealers_router, prefix="/api/dealers", tags=["dealers"])
+app.include_router(car_database_router, prefix="/api/cars", tags=["cars"])
+
 
 @app.get("/")
 def root():
