@@ -73,7 +73,7 @@ export default function DealerDashboard() {
 
   const fetchStats = async (token: string) => {
     try {
-      const response = await fetch('https://revomotors.onrender.com/api/dealers/stats', {
+     // const response = await fetch('https://revomotors.onrender.com/api/dealers/stats', {
         headers: { 'Authorization': `Bearer ${token}` },
       });
       if (response.ok) {
@@ -88,7 +88,7 @@ export default function DealerDashboard() {
   const fetchLeads = async (token: string, source: string) => {
     try {
       setLoading(true);
-      const response = await fetch(`https://revomotors.onrender.com/api/leads?source=${source}`, {
+     // const response = await fetch(`https://revomotors.onrender.com/api/leads?source=${source}`, {
         headers: { 'Authorization': `Bearer ${token}` },
       });
 
