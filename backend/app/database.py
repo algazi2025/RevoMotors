@@ -89,7 +89,6 @@ class Trim(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, unique=True, index=True)
 
-
 class BodyType(Base):
     __tablename__ = "body_types"
     

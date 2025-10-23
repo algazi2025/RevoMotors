@@ -1,30 +1,36 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from typing import Optional, List
-from datetime import datetime, date
+from sqlalchemy import desc
+from typing import List, Optional
+from datetime import datetime
 import logging
 
 from app.database import get_db
 from app.models import (
-    DealerProfile, DealerMarketplaceFilter, DealerDocument, User, UserRole
+    Lead, CarListing, DealerProfile, Message, User, 
+    LeadStatus, LeadSource, UserRole
 )
 from app.auth import get_current_user
+from app.ai_provider.mock_provider import MockAIProvider
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+ai_provider = MockAIProvider()
 
-# ========== DEALER PROFILE ENDPOINTS ==========
-
-@router.get("/profile")
-def get_dealer_profile(
+@router.get("/")
+def get_dealer_leads(
+    source: Optional[str] = None,  # "hot_lead" or "marketplace"
+    status: Optional[str] = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Get current dealer's profile"""
+    """Get all leads for the current dealer"""
     
+    # Verify user is a dealer
     if current_user.role != UserRole.DEALER:
-        raise HTTPException(status_code=403, detail="Only dealers can access this")
+        raise HTTPException(status_code=403, detail="Only dealers can access leads")
     
+    # Get dealer profile
     dealer = db.query(DealerProfile).filter(
         DealerProfile.user_id == current_user.id
     ).first()
@@ -32,461 +38,433 @@ def get_dealer_profile(
     if not dealer:
         raise HTTPException(status_code=404, detail="Dealer profile not found")
     
+    # Query leads
+    query = db.query(Lead, CarListing).join(
+        CarListing, Lead.listing_id == CarListing.id
+    ).filter(Lead.dealer_id == dealer.id)
+    
+    # Filter by source (hot_lead vs marketplace)
+    if source == "hot_lead":
+        query = query.filter(CarListing.source == "hot_lead")
+    elif source == "marketplace":
+        query = query.filter(CarListing.source != "hot_lead")
+    
+    # Filter by status
+    if status:
+        query = query.filter(Lead.status == status)
+    
+    # Order by newest first
+    query = query.order_by(desc(Lead.created_at))
+    
+    results = query.all()
+    
+    # Format response
+    leads = []
+    for lead, listing in results:
+        # Get latest message
+        latest_message = db.query(Message).filter(
+            Message.lead_id == lead.id
+        ).order_by(desc(Message.created_at)).first()
+        
+        leads.append({
+            "lead_id": lead.id,
+            "status": lead.status.value if lead.status else None,
+            "created_at": lead.created_at.isoformat() if lead.created_at else None,
+            "listing": {
+                "id": listing.id,
+                "title": listing.title,
+                "year": listing.year,
+                "make": listing.make,
+                "model": listing.model,
+                "trim": listing.trim,
+                "mileage": listing.mileage,
+                "condition": listing.condition,
+                "vin": listing.vin,
+                "color": listing.color,
+                "asking_price": listing.asking_price,
+                "source": listing.source if isinstance(listing.source, str) else (listing.source.value if listing.source else None),
+                "external_url": listing.external_url,
+                "location": {
+                    "city": listing.city,
+                    "state": listing.state,
+                    "zip_code": listing.zip_code
+                },
+                "seller": {
+                    "name": listing.seller_name,
+                    "email": listing.seller_email,
+                    "phone": listing.seller_phone
+                },
+                "photos": listing.photos or []
+            },
+            "ai_estimate": {
+                "estimated_value": lead.ai_estimated_value,
+                "offer_low": lead.ai_offer_low,
+                "offer_fair": lead.ai_offer_fair,
+                "offer_high": lead.ai_offer_high,
+                "rationale": lead.ai_rationale
+            },
+            "communication": {
+                "first_contact_sent": lead.first_contact_sent,
+                "last_contact_at": lead.last_contact_at.isoformat() if lead.last_contact_at else None,
+                "next_followup_at": lead.next_followup_at.isoformat() if lead.next_followup_at else None,
+                "latest_message": {
+                    "subject": latest_message.subject if latest_message else None,
+                    "body": latest_message.body if latest_message else None,
+                    "sent": latest_message.sent if latest_message else False
+                } if latest_message else None
+            }
+        })
+    
     return {
-        "id": dealer.id,
-        "user_id": dealer.user_id,
-        "company_name": dealer.company_name,
-        "dealership_name": dealer.dealership_name,
-        "license_number": dealer.license_number,
-        "phone": dealer.phone,
-        "address": dealer.address,
-        "city": dealer.city,
-        "state": dealer.state,
-        "zip_code": dealer.zip_code,
-        "website": dealer.website,
-        "verification_status": dealer.verification_status,
-        "communication_preferences": {
-            "auto_followup_enabled": dealer.auto_followup_enabled,
-            "followup_day_1": dealer.followup_day_1,
-            "followup_day_3": dealer.followup_day_3,
-            "followup_day_7": dealer.followup_day_7
+        "total": len(leads),
+        "leads": leads
+    }
+
+@router.get("/{lead_id}")
+def get_lead_details(
+    lead_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get detailed information about a specific lead"""
+    
+    # Get dealer profile
+    dealer = db.query(DealerProfile).filter(
+        DealerProfile.user_id == current_user.id
+    ).first()
+    
+    if not dealer:
+        raise HTTPException(status_code=404, detail="Dealer profile not found")
+    
+    # Get lead with listing
+    lead = db.query(Lead).filter(
+        Lead.id == lead_id,
+        Lead.dealer_id == dealer.id
+    ).first()
+    
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
+    
+    listing = db.query(CarListing).filter(
+        CarListing.id == lead.listing_id
+    ).first()
+    
+    # Get all messages for this lead
+    messages = db.query(Message).filter(
+        Message.lead_id == lead_id
+    ).order_by(Message.created_at).all()
+    
+    return {
+        "lead_id": lead.id,
+        "status": lead.status.value if lead.status else None,
+        "created_at": lead.created_at.isoformat() if lead.created_at else None,
+        "listing": {
+            "id": listing.id,
+            "title": listing.title,
+            "year": listing.year,
+            "make": listing.make,
+            "model": listing.model,
+            "trim": listing.trim,
+            "mileage": listing.mileage,
+            "condition": listing.condition,
+            "vin": listing.vin,
+            "color": listing.color,
+            "transmission": listing.transmission,
+            "fuel_type": listing.fuel_type,
+            "asking_price": listing.asking_price,
+            "description": listing.description,
+            "source": listing.source if isinstance(listing.source, str) else (listing.source.value if listing.source else None),
+            "external_url": listing.external_url,
+            "location": {
+                "city": listing.city,
+                "state": listing.state,
+                "zip_code": listing.zip_code
+            },
+            "seller": {
+                "name": listing.seller_name,
+                "email": listing.seller_email,
+                "phone": listing.seller_phone
+            },
+            "photos": listing.photos or []
         },
-        "created_at": dealer.created_at.isoformat()
+        "ai_estimate": {
+            "estimated_value": lead.ai_estimated_value,
+            "offer_low": lead.ai_offer_low,
+            "offer_fair": lead.ai_offer_fair,
+            "offer_high": lead.ai_offer_high,
+            "rationale": lead.ai_rationale
+        },
+        "dealer_offer": lead.dealer_offer_amount,
+        "messages": [{
+            "id": msg.id,
+            "type": msg.message_type,
+            "subject": msg.subject,
+            "body": msg.body,
+            "generated_by_ai": msg.generated_by_ai,
+            "modified_by_dealer": msg.modified_by_dealer,
+            "sent": msg.sent,
+            "sent_at": msg.sent_at.isoformat() if msg.sent_at else None,
+            "channel": msg.channel,
+            "created_at": msg.created_at.isoformat() if msg.created_at else None
+        } for msg in messages]
     }
 
-@router.put("/profile")
-def update_dealer_profile(
-    company_name: Optional[str] = None,
-    dealership_name: Optional[str] = None,
-    license_number: Optional[str] = None,
-    phone: Optional[str] = None,
-    address: Optional[str] = None,
-    city: Optional[str] = None,
-    state: Optional[str] = None,
-    zip_code: Optional[str] = None,
-    website: Optional[str] = None,
+@router.post("/{lead_id}/generate-message")
+def generate_message(
+    lead_id: int,
+    message_type: str,  # "initial_contact" or "follow_up_1", etc.
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Update dealer profile"""
+    """Generate AI message for a lead"""
     
     dealer = db.query(DealerProfile).filter(
         DealerProfile.user_id == current_user.id
     ).first()
     
-    if not dealer:
-        raise HTTPException(status_code=404, detail="Dealer profile not found")
-    
-    # Update fields if provided
-    if company_name: dealer.company_name = company_name
-    if dealership_name: dealer.dealership_name = dealership_name
-    if license_number: dealer.license_number = license_number
-    if phone: dealer.phone = phone
-    if address: dealer.address = address
-    if city: dealer.city = city
-    if state: dealer.state = state
-    if zip_code: dealer.zip_code = zip_code
-    if website: dealer.website = website
-    
-    db.commit()
-    db.refresh(dealer)
-    
-    return {
-        "success": True,
-        "message": "Profile updated successfully"
-    }
-
-# ========== COMMUNICATION PREFERENCES ==========
-
-@router.put("/communication-preferences")
-def update_communication_preferences(
-    auto_followup_enabled: Optional[bool] = None,
-    followup_day_1: Optional[bool] = None,
-    followup_day_3: Optional[bool] = None,
-    followup_day_7: Optional[bool] = None,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """Update dealer's communication/follow-up preferences"""
-    
-    dealer = db.query(DealerProfile).filter(
-        DealerProfile.user_id == current_user.id
+    lead = db.query(Lead).filter(
+        Lead.id == lead_id,
+        Lead.dealer_id == dealer.id
     ).first()
     
-    if not dealer:
-        raise HTTPException(status_code=404, detail="Dealer profile not found")
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
     
-    # Update preferences
-    if auto_followup_enabled is not None:
-        dealer.auto_followup_enabled = auto_followup_enabled
-    if followup_day_1 is not None:
-        dealer.followup_day_1 = followup_day_1
-    if followup_day_3 is not None:
-        dealer.followup_day_3 = followup_day_3
-    if followup_day_7 is not None:
-        dealer.followup_day_7 = followup_day_7
+    listing = db.query(CarListing).filter(
+        CarListing.id == lead.listing_id
+    ).first()
     
-    db.commit()
+    # Check if message already exists
+    existing_message = db.query(Message).filter(
+        Message.lead_id == lead_id,
+        Message.message_type == message_type,
+        Message.sent == False
+    ).first()
     
-    return {
-        "success": True,
-        "message": "Communication preferences updated",
-        "preferences": {
-            "auto_followup_enabled": dealer.auto_followup_enabled,
-            "followup_day_1": dealer.followup_day_1,
-            "followup_day_3": dealer.followup_day_3,
-            "followup_day_7": dealer.followup_day_7
+    if existing_message:
+        return {
+            "message_id": existing_message.id,
+            "subject": existing_message.subject,
+            "body": existing_message.body,
+            "generated_by_ai": existing_message.generated_by_ai
         }
-    }
-
-# ========== MARKETPLACE FILTERS ==========
-
-@router.get("/filters")
-def get_marketplace_filters(
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """Get dealer's marketplace filters"""
     
-    dealer = db.query(DealerProfile).filter(
-        DealerProfile.user_id == current_user.id
-    ).first()
-    
-    if not dealer:
-        raise HTTPException(status_code=404, detail="Dealer profile not found")
-    
-    filters = db.query(DealerMarketplaceFilter).filter(
-        DealerMarketplaceFilter.dealer_id == dealer.id,
-        DealerMarketplaceFilter.is_active == True
-    ).all()
-    
-    return {
-        "total": len(filters),
-        "filters": [{
-            "id": f.id,
-            "vehicle_filters": {
-                "makes": f.makes or [],
-                "models": f.models or [],
-                "year_min": f.year_min,
-                "year_max": f.year_max,
-                "mileage_max": f.mileage_max,
-                "price_min": f.price_min,
-                "price_max": f.price_max
+    # Generate new message using AI
+    message_data = ai_provider.generate_message(
+        template=message_type,
+        lead_data={
+            "listing": {
+                "year": listing.year,
+                "make": listing.make,
+                "model": listing.model,
+                "mileage": listing.mileage
             },
-            "location_filters": {
-                "zip_codes": f.zip_codes or [],
-                "radius_miles": f.radius_miles
+            "seller_name": listing.seller_name or "there",
+            "offer": {
+                "amount": lead.ai_offer_fair or lead.dealer_offer_amount
             },
-            "marketplaces": {
-                "facebook": f.facebook_enabled,
-                "offerup": f.offerup_enabled,
-                "craigslist": f.craigslist_enabled,
-                "autotrader": f.autotrader_enabled,
-                "carscom": f.carscom_enabled
-            },
-            "is_active": f.is_active,
-            "created_at": f.created_at.isoformat()
-        } for f in filters]
-    }
-
-@router.post("/filters")
-def create_marketplace_filter(
-    makes: Optional[List[str]] = None,
-    models: Optional[List[str]] = None,
-    year_min: Optional[int] = None,
-    year_max: Optional[int] = None,
-    mileage_max: Optional[int] = None,
-    price_min: Optional[float] = None,
-    price_max: Optional[float] = None,
-    zip_codes: Optional[List[str]] = None,
-    radius_miles: int = 50,
-    facebook_enabled: bool = True,
-    offerup_enabled: bool = True,
-    craigslist_enabled: bool = True,
-    autotrader_enabled: bool = False,
-    carscom_enabled: bool = False,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """Create new marketplace filter"""
-    
-    dealer = db.query(DealerProfile).filter(
-        DealerProfile.user_id == current_user.id
-    ).first()
-    
-    if not dealer:
-        raise HTTPException(status_code=404, detail="Dealer profile not found")
-    
-    # Create filter
-    new_filter = DealerMarketplaceFilter(
-        dealer_id=dealer.id,
-        makes=makes or [],
-        models=models or [],
-        year_min=year_min,
-        year_max=year_max,
-        mileage_max=mileage_max,
-        price_min=price_min,
-        price_max=price_max,
-        zip_codes=zip_codes or [],
-        radius_miles=radius_miles,
-        facebook_enabled=facebook_enabled,
-        offerup_enabled=offerup_enabled,
-        craigslist_enabled=craigslist_enabled,
-        autotrader_enabled=autotrader_enabled,
-        carscom_enabled=carscom_enabled,
-        is_active=True
+            "dealer_name": f"{current_user.first_name} {current_user.last_name}",
+            "dealership_name": dealer.company_name
+        },
+        tone="friendly"
     )
     
-    db.add(new_filter)
-    db.commit()
-    db.refresh(new_filter)
-    
-    return {
-        "success": True,
-        "message": "Filter created successfully",
-        "filter_id": new_filter.id
-    }
-
-@router.put("/filters/{filter_id}")
-def update_marketplace_filter(
-    filter_id: int,
-    makes: Optional[List[str]] = None,
-    models: Optional[List[str]] = None,
-    year_min: Optional[int] = None,
-    year_max: Optional[int] = None,
-    mileage_max: Optional[int] = None,
-    price_min: Optional[float] = None,
-    price_max: Optional[float] = None,
-    zip_codes: Optional[List[str]] = None,
-    radius_miles: Optional[int] = None,
-    facebook_enabled: Optional[bool] = None,
-    offerup_enabled: Optional[bool] = None,
-    craigslist_enabled: Optional[bool] = None,
-    autotrader_enabled: Optional[bool] = None,
-    carscom_enabled: Optional[bool] = None,
-    is_active: Optional[bool] = None,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """Update existing marketplace filter"""
-    
-    dealer = db.query(DealerProfile).filter(
-        DealerProfile.user_id == current_user.id
-    ).first()
-    
-    filter_obj = db.query(DealerMarketplaceFilter).filter(
-        DealerMarketplaceFilter.id == filter_id,
-        DealerMarketplaceFilter.dealer_id == dealer.id
-    ).first()
-    
-    if not filter_obj:
-        raise HTTPException(status_code=404, detail="Filter not found")
-    
-    # Update fields
-    if makes is not None: filter_obj.makes = makes
-    if models is not None: filter_obj.models = models
-    if year_min is not None: filter_obj.year_min = year_min
-    if year_max is not None: filter_obj.year_max = year_max
-    if mileage_max is not None: filter_obj.mileage_max = mileage_max
-    if price_min is not None: filter_obj.price_min = price_min
-    if price_max is not None: filter_obj.price_max = price_max
-    if zip_codes is not None: filter_obj.zip_codes = zip_codes
-    if radius_miles is not None: filter_obj.radius_miles = radius_miles
-    if facebook_enabled is not None: filter_obj.facebook_enabled = facebook_enabled
-    if offerup_enabled is not None: filter_obj.offerup_enabled = offerup_enabled
-    if craigslist_enabled is not None: filter_obj.craigslist_enabled = craigslist_enabled
-    if autotrader_enabled is not None: filter_obj.autotrader_enabled = autotrader_enabled
-    if carscom_enabled is not None: filter_obj.carscom_enabled = carscom_enabled
-    if is_active is not None: filter_obj.is_active = is_active
-    
-    db.commit()
-    
-    return {
-        "success": True,
-        "message": "Filter updated successfully"
-    }
-
-@router.delete("/filters/{filter_id}")
-def delete_marketplace_filter(
-    filter_id: int,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """Delete marketplace filter"""
-    
-    dealer = db.query(DealerProfile).filter(
-        DealerProfile.user_id == current_user.id
-    ).first()
-    
-    filter_obj = db.query(DealerMarketplaceFilter).filter(
-        DealerMarketplaceFilter.id == filter_id,
-        DealerMarketplaceFilter.dealer_id == dealer.id
-    ).first()
-    
-    if not filter_obj:
-        raise HTTPException(status_code=404, detail="Filter not found")
-    
-    db.delete(filter_obj)
-    db.commit()
-    
-    return {
-        "success": True,
-        "message": "Filter deleted successfully"
-    }
-
-# ========== DOCUMENTS ==========
-
-@router.get("/documents")
-def get_dealer_documents(
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """Get all dealer documents"""
-    
-    dealer = db.query(DealerProfile).filter(
-        DealerProfile.user_id == current_user.id
-    ).first()
-    
-    documents = db.query(DealerDocument).filter(
-        DealerDocument.dealer_id == dealer.id
-    ).all()
-    
-    return {
-        "total": len(documents),
-        "documents": [{
-            "id": doc.id,
-            "document_type": doc.document_type,
-            "document_name": doc.document_name,
-            "file_url": doc.file_url,
-            "expires_at": doc.expires_at.isoformat() if doc.expires_at else None,
-            "verified": doc.verified,
-            "uploaded_at": doc.uploaded_at.isoformat()
-        } for doc in documents]
-    }
-
-@router.post("/documents")
-def upload_dealer_document(
-    document_type: str,
-    document_name: str,
-    file_url: str,  # In production, handle actual file upload
-    expires_at: Optional[date] = None,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """Upload dealer document (license, insurance, etc.)"""
-    
-    dealer = db.query(DealerProfile).filter(
-        DealerProfile.user_id == current_user.id
-    ).first()
-    
-    if not dealer:
-        raise HTTPException(status_code=404, detail="Dealer profile not found")
-    
-    # Create document record
-    document = DealerDocument(
+    # Save message
+    new_message = Message(
+        lead_id=lead_id,
         dealer_id=dealer.id,
-        document_type=document_type,
-        document_name=document_name,
-        file_url=file_url,
-        expires_at=expires_at,
-        verified=False
+        message_type=message_type,
+        subject=message_data.get("subject", ""),
+        body=message_data.get("body", ""),
+        generated_by_ai=True,
+        channel="email"
     )
     
-    db.add(document)
+    db.add(new_message)
     db.commit()
-    db.refresh(document)
+    db.refresh(new_message)
     
     return {
-        "success": True,
-        "message": "Document uploaded successfully",
-        "document_id": document.id
+        "message_id": new_message.id,
+        "subject": new_message.subject,
+        "body": new_message.body,
+        "generated_by_ai": new_message.generated_by_ai
     }
 
-@router.delete("/documents/{document_id}")
-def delete_dealer_document(
-    document_id: int,
+@router.post("/{lead_id}/send-message")
+def send_message(
+    lead_id: int,
+    message_id: int,
+    updated_body: Optional[str] = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Delete dealer document"""
+    """Send a message to the seller (dealer clicks 'Send')"""
     
     dealer = db.query(DealerProfile).filter(
         DealerProfile.user_id == current_user.id
     ).first()
     
-    document = db.query(DealerDocument).filter(
-        DealerDocument.id == document_id,
-        DealerDocument.dealer_id == dealer.id
+    lead = db.query(Lead).filter(
+        Lead.id == lead_id,
+        Lead.dealer_id == dealer.id
     ).first()
     
-    if not document:
-        raise HTTPException(status_code=404, detail="Document not found")
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
     
-    db.delete(document)
+    message = db.query(Message).filter(
+        Message.id == message_id,
+        Message.lead_id == lead_id
+    ).first()
+    
+    if not message:
+        raise HTTPException(status_code=404, detail="Message not found")
+    
+    # If dealer modified the message
+    if updated_body and updated_body != message.body:
+        message.body = updated_body
+        message.modified_by_dealer = True
+    
+    # Mark as sent
+    message.sent = True
+    message.sent_at = datetime.utcnow()
+    
+    # Update lead
+    if not lead.first_contact_sent:
+        lead.first_contact_sent = True
+        lead.first_contact_at = datetime.utcnow()
+    
+    lead.last_contact_at = datetime.utcnow()
+    lead.status = LeadStatus.CONTACTED
+    
+    # TODO: Actually send email/SMS here using SendGrid, Twilio, etc.
+    logger.info(f"Message sent to seller for lead {lead_id}")
+    
     db.commit()
     
     return {
         "success": True,
-        "message": "Document deleted successfully"
+        "message": "Message sent successfully",
+        "sent_at": message.sent_at.isoformat() if message.sent_at else None
     }
 
-# ========== DASHBOARD STATS ==========
-
-@router.get("/stats")
-def get_dealer_stats(
+@router.put("/{lead_id}/update-offer")
+def update_offer(
+    lead_id: int,
+    offer_amount: float,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Get dealer dashboard statistics"""
-    
-    from app.models import Lead, LeadStatus, LeadSource, CarListing
+    """Dealer updates the offer amount"""
     
     dealer = db.query(DealerProfile).filter(
         DealerProfile.user_id == current_user.id
     ).first()
     
-    if not dealer:
-        raise HTTPException(status_code=404, detail="Dealer profile not found")
+    lead = db.query(Lead).filter(
+        Lead.id == lead_id,
+        Lead.dealer_id == dealer.id
+    ).first()
     
-    # Get total leads
-    total_leads = db.query(Lead).filter(Lead.dealer_id == dealer.id).count()
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
     
-    # Get hot leads count
-    hot_leads = db.query(Lead).join(CarListing).filter(
-        Lead.dealer_id == dealer.id,
-        CarListing.source == LeadSource.HOT_LEAD
-    ).count()
+    lead.dealer_offer_amount = offer_amount
+    lead.updated_at = datetime.utcnow()
     
-    # Get marketplace leads count
-    marketplace_leads = db.query(Lead).join(CarListing).filter(
-        Lead.dealer_id == dealer.id,
-        CarListing.source != LeadSource.HOT_LEAD
-    ).count()
-    
-    # Get new leads (not contacted yet)
-    new_leads = db.query(Lead).filter(
-        Lead.dealer_id == dealer.id,
-        Lead.status == LeadStatus.NEW
-    ).count()
-    
-    # Get contacted leads
-    contacted_leads = db.query(Lead).filter(
-        Lead.dealer_id == dealer.id,
-        Lead.status == LeadStatus.CONTACTED
-    ).count()
-    
-    # Get won deals
-    won_deals = db.query(Lead).filter(
-        Lead.dealer_id == dealer.id,
-        Lead.status == LeadStatus.WON
-    ).count()
+    db.commit()
     
     return {
-        "total_leads": total_leads,
-        "hot_leads": hot_leads,
-        "marketplace_leads": marketplace_leads,
-        "new_leads": new_leads,
-        "contacted_leads": contacted_leads,
-        "won_deals": won_deals,
-        "conversion_rate": round((won_deals / total_leads * 100) if total_leads > 0 else 0, 2)
+        "success": True,
+        "lead_id": lead_id,
+        "dealer_offer_amount": offer_amount
+    }
+
+@router.post("/webhook/lead_received")
+def receive_lead_webhook(payload: dict, db: Session = Depends(get_db)):
+    """Webhook to receive new car listings (from marketplaces or direct submissions)"""
+    
+    logger.info(f"Received lead webhook: {payload}")
+    
+    # Determine source - store as string
+    source = "hot_lead"
+    if payload.get("marketplace"):
+        marketplace = payload["marketplace"].lower()
+        if marketplace in ["facebook", "offerup", "craigslist", "autotrader", "carscom", "cargurus"]:
+            source = marketplace
+    
+    # Create car listing
+    listing = CarListing(
+        title=payload.get("title", f"{payload['year']} {payload['make']} {payload['model']}"),
+        year=payload["year"],
+        make=payload["make"],
+        model=payload["model"],
+        trim=payload.get("trim"),
+        mileage=payload["mileage"],
+        condition=payload.get("condition", "good"),
+        vin=payload.get("vin"),
+        color=payload.get("color"),
+        transmission=payload.get("transmission"),
+        fuel_type=payload.get("fuel_type"),
+        asking_price=payload.get("price") or payload.get("asking_price"),
+        region=payload.get("region"),
+        city=payload.get("city"),
+        state=payload.get("state"),
+        zip_code=payload.get("zip_code"),
+        source=source,
+        external_listing_id=payload.get("external_id"),
+        external_url=payload.get("url"),
+        seller_name=payload.get("seller_contact_name"),
+        seller_email=payload.get("seller_contact_email"),
+        seller_phone=payload.get("seller_contact_phone"),
+        description=payload.get("description"),
+        photos=payload.get("photos", [])
+    )
+    
+    db.add(listing)
+    db.flush()
+    
+    # Generate AI estimate
+    ai_estimate = ai_provider.estimate_offer(
+        year=listing.year,
+        make=listing.make,
+        model=listing.model,
+        mileage=listing.mileage,
+        condition=listing.condition or "good",
+        region=listing.region or "normal"
+    )
+    
+    # Find matching dealers (simplified - match all verified dealers for now)
+    # TODO: Implement proper filter matching
+    dealers = db.query(DealerProfile).filter(
+        DealerProfile.verification_status == "verified"
+    ).all()
+    
+    created_leads = []
+    
+    for dealer in dealers:
+        # Create lead for each matching dealer
+        lead = Lead(
+            listing_id=listing.id,
+            dealer_id=dealer.id,
+            status=LeadStatus.NEW,
+            ai_estimated_value=ai_estimate.get("fair"),
+            ai_offer_low=ai_estimate.get("low"),
+            ai_offer_fair=ai_estimate.get("fair"),
+            ai_offer_high=ai_estimate.get("max"),
+            ai_rationale=ai_estimate.get("rationale", "")
+        )
+        db.add(lead)
+        db.flush()
+        
+        created_leads.append(lead.id)
+    
+    db.commit()
+    
+    return {
+        "status": "received",
+        "listing_id": listing.id,
+        "leads_created": len(created_leads),
+        "ai_draft_offer": ai_estimate
     }

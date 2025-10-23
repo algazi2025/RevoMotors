@@ -91,10 +91,12 @@ async def startup_event():
     
     # Add missing columns to all tables
     logger.info("Verifying database columns...")
+    db = None
     try:
         db = SessionLocal()
         
         # Add missing columns to dealer_profiles table
+        logger.info("Adding dealer_profiles columns...")
         db.execute(text("""
             ALTER TABLE dealer_profiles 
             ADD COLUMN IF NOT EXISTS license_number VARCHAR(100),
@@ -110,8 +112,18 @@ async def startup_event():
             ADD COLUMN IF NOT EXISTS followup_day_3 BOOLEAN DEFAULT true,
             ADD COLUMN IF NOT EXISTS followup_day_7 BOOLEAN DEFAULT true
         """))
+        db.commit()
+        
+        # Add missing columns to seller_profiles table
+        logger.info("Adding seller_profiles columns...")
+        db.execute(text("""
+            ALTER TABLE seller_profiles 
+            ADD COLUMN IF NOT EXISTS phone VARCHAR(50)
+        """))
+        db.commit()
         
         # Add missing columns to leads table (AI capabilities)
+        logger.info("Adding leads columns...")
         db.execute(text("""
             ALTER TABLE leads 
             ADD COLUMN IF NOT EXISTS ai_estimated_value FLOAT,
@@ -120,20 +132,10 @@ async def startup_event():
             ADD COLUMN IF NOT EXISTS ai_offer_high FLOAT,
             ADD COLUMN IF NOT EXISTS ai_rationale TEXT
         """))
-        
-        # Create LeadSource enum type if it doesn't exist
-        try:
-            db.execute(text("""
-                CREATE TYPE leadsource AS ENUM (
-                    'hot_lead', 'facebook', 'offerup', 'craigslist', 
-                    'autotrader', 'carscom', 'cargurus'
-                )
-            """))
-            db.commit()
-        except:
-            db.rollback()  # Type might already exist
+        db.commit()
         
         # Add missing columns to car_listings table
+        logger.info("Adding car_listings columns...")
         db.execute(text("""
             ALTER TABLE car_listings 
             ADD COLUMN IF NOT EXISTS photos JSON,
@@ -143,25 +145,17 @@ async def startup_event():
             ADD COLUMN IF NOT EXISTS seller_phone VARCHAR(50),
             ADD COLUMN IF NOT EXISTS seller_email VARCHAR(255),
             ADD COLUMN IF NOT EXISTS seller_name VARCHAR(255),
-            ADD COLUMN IF NOT EXISTS zip_code VARCHAR(20),
-            ADD COLUMN IF NOT EXISTS state VARCHAR(50),
-            ADD COLUMN IF NOT EXISTS city VARCHAR(100),
             ADD COLUMN IF NOT EXISTS region VARCHAR(100),
             ADD COLUMN IF NOT EXISTS fuel_type VARCHAR(50),
             ADD COLUMN IF NOT EXISTS transmission VARCHAR(50),
             ADD COLUMN IF NOT EXISTS color VARCHAR(50),
             ADD COLUMN IF NOT EXISTS vin VARCHAR(17),
-            ADD COLUMN IF NOT EXISTS condition VARCHAR(50),
-            ADD COLUMN IF NOT EXISTS mileage INTEGER,
-            ADD COLUMN IF NOT EXISTS trim VARCHAR(100),
-            ADD COLUMN IF NOT EXISTS model VARCHAR(100),
-            ADD COLUMN IF NOT EXISTS make VARCHAR(100),
-            ADD COLUMN IF NOT EXISTS year INTEGER,
-            ADD COLUMN IF NOT EXISTS title VARCHAR(255),
-            ADD COLUMN IF NOT EXISTS asking_price FLOAT
+            ADD COLUMN IF NOT EXISTS condition VARCHAR(50)
         """))
+        db.commit()
         
         # Add missing columns to messages table
+        logger.info("Adding messages columns...")
         db.execute(text("""
             ALTER TABLE messages 
             ADD COLUMN IF NOT EXISTS channel VARCHAR(50),
@@ -170,20 +164,20 @@ async def startup_event():
             ADD COLUMN IF NOT EXISTS sent_at TIMESTAMP,
             ADD COLUMN IF NOT EXISTS sent BOOLEAN DEFAULT false,
             ADD COLUMN IF NOT EXISTS modified_by_dealer BOOLEAN DEFAULT false,
-            ADD COLUMN IF NOT EXISTS generated_by_ai BOOLEAN DEFAULT true,
-            ADD COLUMN IF NOT EXISTS body TEXT,
-            ADD COLUMN IF NOT EXISTS subject VARCHAR(500),
-            ADD COLUMN IF NOT EXISTS message_type VARCHAR(50)
+            ADD COLUMN IF NOT EXISTS generated_by_ai BOOLEAN DEFAULT true
         """))
+        db.commit()
         
         # Add missing columns to offers table
+        logger.info("Adding offers columns...")
         db.execute(text("""
             ALTER TABLE offers 
-            ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'pending',
-            ADD COLUMN IF NOT EXISTS amount DECIMAL(10, 2)
+            ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'pending'
         """))
+        db.commit()
         
         # Add missing columns to dealer_documents table
+        logger.info("Adding dealer_documents columns...")
         db.execute(text("""
             ALTER TABLE dealer_documents 
             ADD COLUMN IF NOT EXISTS uploaded_at TIMESTAMP,
@@ -193,18 +187,17 @@ async def startup_event():
             ADD COLUMN IF NOT EXISTS document_name VARCHAR(255),
             ADD COLUMN IF NOT EXISTS document_type VARCHAR(100)
         """))
-        
-        # Add missing columns to seller_profiles table
-        db.execute(text("""
-            ALTER TABLE seller_profiles 
-            ADD COLUMN IF NOT EXISTS phone VARCHAR(50)
-        """))
-        
         db.commit()
-        db.close()
+        
         logger.info("✅ All table columns verified!")
+        
     except Exception as e:
-        logger.warning(f"Column verification: {e}")
+        logger.warning(f"Column verification error: {e}")
+        if db:
+            db.rollback()
+    finally:
+        if db:
+            db.close()
     
     # Seed car data
     try:
