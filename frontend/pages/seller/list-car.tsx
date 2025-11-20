@@ -41,7 +41,7 @@ export default function ListCar() {
   useEffect(() => {
     const fetchMakes = async () => {
       try {
-        const response = await fetch('https://revomotors-api.onrender.com/api/cars/makes');
+        const response = await fetch('https://revomotors.onrender.com/api/cars/makes');
         if (!response.ok) throw new Error('Failed to fetch makes');
         const data = await response.json();
         setMakes(data);
@@ -58,7 +58,7 @@ export default function ListCar() {
     if (formData.make) {
       const fetchModels = async () => {
         try {
-          const response = await fetch(`https://revomotors-api.onrender.com/api/cars/models?make=${formData.make}`);
+          const response = await fetch(`https://revomotors.onrender.com/api/cars/models?make=${formData.make}`);
           if (!response.ok) throw new Error('Failed to fetch models');
           const data = await response.json();
           setModels(data);
@@ -163,7 +163,7 @@ export default function ListCar() {
         photos: photoUrls,
       };
 
-      const response = await fetch('https://revomotors-api.onrender.com/api/leads/webhook/lead_received', {
+      const response = await fetch('https://revomotors.onrender.com/api/leads/webhook/lead_received', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
