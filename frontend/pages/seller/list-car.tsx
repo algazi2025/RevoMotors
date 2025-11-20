@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 export default function ListCar() {
   const [formData, setFormData] = useState({
@@ -26,21 +26,27 @@ export default function ListCar() {
   const [photos, setPhotos] = useState<File[]>([]);
   const [loading, setLoading] = useState(false);
   
-  // Autocomplete
+  // Autocomplete state
   const [makes, setMakes] = useState<string[]>([]);
   const [models, setModels] = useState<string[]>([]);
-  const [makeSuggestions, setMakeSuggestions] = useState<string[]>([]);
-  const [modelSuggestions, setModelSuggestions] = useState<string[]>([]);
-  const [showMakeSuggestions, setShowMakeSuggestions] = useState(false);
-  const [showModelSuggestions, setShowModelSuggestions] = useState(false);
+  const [filteredMakes, setFilteredMakes] = useState<string[]>([]);
+  const [filteredModels, setFilteredModels] = useState<string[]>([]);
+  const [showMakeDropdown, setShowMakeDropdown] = useState(false);
+  const [showModelDropdown, setShowModelDropdown] = useState(false);
+  
+  const makeRef = useRef<HTMLDivElement>(null);
+  const modelRef = useRef<HTMLDivElement>(null);
 
-  // Fetch makes
+  // Fetch makes on mount
   useEffect(() => {
     const fetchMakes = async () => {
       try {
         const response = await fetch('https://revomotors-api.onrender.com/api/cars/makes');
-const data = await response.json();
-setMakes(data.makes || []);
+        if (!response.ok) throw new Error('Failed to fetch makes');
+        const data = await response.json();
+        const makesList = data.makes || [];
+        setMakes(makesList);
+        setFilteredMakes(makesList);
       } catch (error) {
         console.error('Error fetching makes:', error);
       }
@@ -54,50 +60,64 @@ setMakes(data.makes || []);
       const fetchModels = async () => {
         try {
           const response = await fetch(`https://revomotors-api.onrender.com/api/cars/models?make=${formData.make}`);
-const data = await response.json();
-setModels(data.models || []);
+          if (!response.ok) throw new Error('Failed to fetch models');
+          const data = await response.json();
+          const modelsList = data.models || [];
+          setModels(modelsList);
+          setFilteredModels(modelsList);
         } catch (error) {
           console.error('Error fetching models:', error);
         }
       };
       fetchModels();
+    } else {
+      setModels([]);
+      setFilteredModels([]);
     }
   }, [formData.make]);
 
-  const handleMakeChange = (value: string) => {
+  // Handle make input
+  const handleMakeInput = (value: string) => {
     setFormData({...formData, make: value, model: ''});
-    setModels([]);
     
     if (value.length > 0) {
       const filtered = makes.filter(m => m.toLowerCase().includes(value.toLowerCase()));
-      setMakeSuggestions(filtered);
-      setShowMakeSuggestions(true);
+      setFilteredMakes(filtered);
+      setShowMakeDropdown(true);
     } else {
-      setShowMakeSuggestions(false);
+      setFilteredMakes(makes);
+      setShowMakeDropdown(false);
     }
   };
 
-  const handleSelectMake = (make: string) => {
-    setFormData({...formData, make, model: ''});
-    setShowMakeSuggestions(false);
-  };
-
-  const handleModelChange = (value: string) => {
+  // Handle model input
+  const handleModelInput = (value: string) => {
     setFormData({...formData, model: value});
     
-    if (value.length > 0) {
+    if (value.length > 0 && formData.make) {
       const filtered = models.filter(m => m.toLowerCase().includes(value.toLowerCase()));
-      setModelSuggestions(filtered);
-      setShowModelSuggestions(true);
+      setFilteredModels(filtered);
+      setShowModelDropdown(true);
     } else {
-      setShowModelSuggestions(false);
+      setFilteredModels(models);
+      setShowModelDropdown(false);
     }
   };
 
-  const handleSelectModel = (model: string) => {
-    setFormData({...formData, model});
-    setShowModelSuggestions(false);
-  };
+  // Click outside to close dropdowns
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (makeRef.current && !makeRef.current.contains(event.target as Node)) {
+        setShowMakeDropdown(false);
+      }
+      if (modelRef.current && !modelRef.current.contains(event.target as Node)) {
+        setShowModelDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -192,8 +212,8 @@ setModels(data.models || []);
   };
 
   const labelStyle = {
-    display: 'block',
-    fontWeight: '500',
+    display: 'block' as const,
+    fontWeight: '500' as const,
     marginBottom: '8px',
     fontSize: '14px',
   };
@@ -204,15 +224,26 @@ setModels(data.models || []);
     borderBottom: '1px solid #e5e7eb',
   };
 
-  const suggestionsStyle = {
+  const dropdownStyle = {
     position: 'absolute' as const,
+    top: '100%',
+    left: 0,
+    right: 0,
     backgroundColor: 'white',
     border: '1px solid #d1d5db',
     borderRadius: '6px',
-    maxHeight: '200px',
+    maxHeight: '250px',
     overflowY: 'auto' as const,
-    width: '100%',
     zIndex: 10,
+    marginTop: '4px',
+    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+  };
+
+  const optionStyle = {
+    padding: '10px 12px',
+    cursor: 'pointer',
+    borderBottom: '1px solid #f3f4f6',
+    transition: 'background-color 0.2s',
   };
 
   return (
@@ -256,29 +287,35 @@ setModels(data.models || []);
                 />
               </div>
 
-              {/* Make with Autocomplete */}
-              <div style={{ position: 'relative' }}>
+              {/* Make Dropdown */}
+              <div style={{ position: 'relative' }} ref={makeRef}>
                 <label style={labelStyle}>Make *</label>
                 <input
                   type="text"
                   required
                   value={formData.make}
-                  onChange={(e) => handleMakeChange(e.target.value)}
-                  onFocus={() => formData.make && setShowMakeSuggestions(true)}
+                  onChange={(e) => handleMakeInput(e.target.value)}
+                  onFocus={() => {
+                    setShowMakeDropdown(true);
+                    if (formData.make === '') {
+                      setFilteredMakes(makes);
+                    }
+                  }}
                   style={inputStyle}
-                  placeholder="Honda, Toyota, Ford..."
+                  placeholder="Click to select or type..."
                 />
-                {showMakeSuggestions && makeSuggestions.length > 0 && (
-                  <div style={suggestionsStyle}>
-                    {makeSuggestions.map((make) => (
+                {showMakeDropdown && filteredMakes.length > 0 && (
+                  <div style={dropdownStyle}>
+                    {filteredMakes.map((make) => (
                       <div
                         key={make}
-                        onClick={() => handleSelectMake(make)}
-                        style={{
-                          padding: '10px 12px',
-                          cursor: 'pointer',
-                          borderBottom: '1px solid #e5e7eb',
+                        onClick={() => {
+                          setFormData({...formData, make, model: ''});
+                          setShowMakeDropdown(false);
                         }}
+                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f3f4f6')}
+                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'white')}
+                        style={optionStyle}
                       >
                         {make}
                       </div>
@@ -287,30 +324,42 @@ setModels(data.models || []);
                 )}
               </div>
 
-              {/* Model with Autocomplete */}
-              <div style={{ position: 'relative' }}>
+              {/* Model Dropdown */}
+              <div style={{ position: 'relative' }} ref={modelRef}>
                 <label style={labelStyle}>Model *</label>
                 <input
                   type="text"
                   required
                   disabled={!formData.make}
                   value={formData.model}
-                  onChange={(e) => handleModelChange(e.target.value)}
-                  onFocus={() => formData.model && setShowModelSuggestions(true)}
-                  style={{...inputStyle, backgroundColor: !formData.make ? '#f3f4f6' : 'white'}}
-                  placeholder={formData.make ? 'Civic, Accord, CR-V...' : 'Select make first'}
+                  onChange={(e) => handleModelInput(e.target.value)}
+                  onFocus={() => {
+                    if (formData.make) {
+                      setShowModelDropdown(true);
+                      if (formData.model === '') {
+                        setFilteredModels(models);
+                      }
+                    }
+                  }}
+                  style={{
+                    ...inputStyle,
+                    backgroundColor: !formData.make ? '#f3f4f6' : 'white',
+                    cursor: !formData.make ? 'not-allowed' : 'text',
+                  }}
+                  placeholder={formData.make ? 'Click to select or type...' : 'Select make first'}
                 />
-                {showModelSuggestions && modelSuggestions.length > 0 && (
-                  <div style={suggestionsStyle}>
-                    {modelSuggestions.map((model) => (
+                {showModelDropdown && formData.make && filteredModels.length > 0 && (
+                  <div style={dropdownStyle}>
+                    {filteredModels.map((model) => (
                       <div
                         key={model}
-                        onClick={() => handleSelectModel(model)}
-                        style={{
-                          padding: '10px 12px',
-                          cursor: 'pointer',
-                          borderBottom: '1px solid #e5e7eb',
+                        onClick={() => {
+                          setFormData({...formData, model});
+                          setShowModelDropdown(false);
                         }}
+                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f3f4f6')}
+                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'white')}
+                        style={optionStyle}
                       >
                         {model}
                       </div>
