@@ -120,7 +120,7 @@ export default function LeadDetailPage() {
         alert('✅ Message sent successfully!');
         setAiMessage(null);
         setEditedMessage('');
-        fetchLeadDetails(token, id as string);
+        fetchLeadDetails(token as string, id as string);
       } else {
         alert('Failed to send message');
       }
