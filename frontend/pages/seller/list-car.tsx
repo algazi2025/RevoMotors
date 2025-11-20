@@ -39,8 +39,8 @@ export default function ListCar() {
     const fetchMakes = async () => {
       try {
         const response = await fetch('https://revomotors-api.onrender.com/api/cars/makes');
-        const data = await response.json();
-        setMakes(data);
+const data = await response.json();
+setMakes(data.makes || []);
       } catch (error) {
         console.error('Error fetching makes:', error);
       }
@@ -54,8 +54,8 @@ export default function ListCar() {
       const fetchModels = async () => {
         try {
           const response = await fetch(`https://revomotors-api.onrender.com/api/cars/models?make=${formData.make}`);
-          const data = await response.json();
-          setModels(data);
+const data = await response.json();
+setModels(data.models || []);
         } catch (error) {
           console.error('Error fetching models:', error);
         }
