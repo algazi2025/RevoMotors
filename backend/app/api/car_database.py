@@ -23,6 +23,12 @@ async def preflight(path_name: str):
     )
 
 
+@router.get("/test")
+def test_endpoint():
+    """Test endpoint to verify router is working"""
+    return {"status": "car_database router is working"}
+
+
 @router.get("/makes")
 def get_all_makes(db: Session = Depends(get_db)):
     """Get all available car makes"""
