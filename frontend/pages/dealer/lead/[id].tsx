@@ -95,7 +95,7 @@ export default function LeadDetailPage() {
 
       if (response.ok) {
         alert('✅ Offer updated!');
-        fetchLeadDetails(token, id as string);
+        fetchLeadDetails(token as string, id as string);
       }
     } catch (error) {
       console.error('Error updating offer:', error);
