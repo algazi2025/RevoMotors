@@ -179,4 +179,4 @@ function App({ Component, pageProps }: AppProps) {
 }
 
 export default App;
-export { AuthProvider, useAuth, ProtectedRoute, ErrorBoundary };
+// export { AuthProvider, useAuth, ProtectedRoute, ErrorBoundary };
