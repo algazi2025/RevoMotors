@@ -82,7 +82,7 @@ export default function LeadDetailPage() {
 
   const handleUpdateOffer = async () => {
     const token = localStorage.getItem('dealer_token');
-    if (!customOffer) return;
+    if (!token || !customOffer) return;
 
     try {
       const response = await fetch(
