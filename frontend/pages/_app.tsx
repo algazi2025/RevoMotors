@@ -1,6 +1,5 @@
 import type { AppProps } from 'next/app';
-import { ReactNode, createContext, useContext, useState, useEffect } from 'react';
-import { useRouter } from 'next/router';
+import React, { ReactNode, createContext, useContext, useState, useEffect } from 'react';import { useRouter } from 'next/router';
 import { api } from '@/lib/api';
 
 // Auth Context
