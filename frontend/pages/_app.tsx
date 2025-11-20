@@ -92,7 +92,7 @@ const AuthProvider = ({ children }: AuthProviderProps) => {
         isLoading,
         login,
         logout,
-        isAuthenticated: !!user || !!localStorage.getItem('access_token'),
+        isAuthenticated: !!user || (typeof window !== 'undefined' && !!localStorage.getItem('access_token')),
       }}
     >
       {children}
