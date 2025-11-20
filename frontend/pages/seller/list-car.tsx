@@ -44,9 +44,8 @@ export default function ListCar() {
         const response = await fetch('https://revomotors-api.onrender.com/api/cars/makes');
         if (!response.ok) throw new Error('Failed to fetch makes');
         const data = await response.json();
-        const makesList = data.makes || [];
-        setMakes(makesList);
-        setFilteredMakes(makesList);
+        setMakes(data);
+        setFilteredMakes(data);
       } catch (error) {
         console.error('Error fetching makes:', error);
       }
@@ -62,9 +61,8 @@ export default function ListCar() {
           const response = await fetch(`https://revomotors-api.onrender.com/api/cars/models?make=${formData.make}`);
           if (!response.ok) throw new Error('Failed to fetch models');
           const data = await response.json();
-          const modelsList = data.models || [];
-          setModels(modelsList);
-          setFilteredModels(modelsList);
+          setModels(data);
+          setFilteredModels(data);
         } catch (error) {
           console.error('Error fetching models:', error);
         }
