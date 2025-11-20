@@ -41,13 +41,15 @@ const AuthProvider = ({ children }: AuthProviderProps) => {
 
   // Check if user is logged in on mount
   useEffect(() => {
-    const token = localStorage.getItem('access_token');
-    if (token) {
-      // Optionally verify token with backend
-      // For now, just set loading to false
-      setIsLoading(false);
-    } else {
-      setIsLoading(false);
+    if (typeof window !== 'undefined') {
+      const token = localStorage.getItem('access_token');
+      if (token) {
+        // Optionally verify token with backend
+        // For now, just set loading to false
+        setIsLoading(false);
+      } else {
+        setIsLoading(false);
+      }
     }
   }, []);
 
