@@ -40,14 +40,21 @@ app = FastAPI(
     description="AI-powered used car marketplace API"
 )
 
-# CORS Configuration
+# CORS Configuration - MUST BE FIRST MIDDLEWARE
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "https://revomotors.onrender.com",
+        "https://revomotors-frontend.onrender.com",
+        "http://localhost:3000",
+        "http://localhost:5173",
+        "*"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
     expose_headers=["*"],
+    max_age=3600,
 )
 
 # Global exception handler

@@ -4,11 +4,23 @@ Provides comprehensive vehicle information
 Supports: Makes, Models, Trims, Years, Body Types, etc.
 """
 
-from fastapi import APIRouter, Query, Depends
+from fastapi import APIRouter, Query, Depends, Response
 from sqlalchemy.orm import Session
 from typing import List
 from app.database import get_db, Make, Model, Trim, BodyType, Transmission, FuelType
 router = APIRouter()
+
+
+@router.options("/{path_name:path}")
+async def preflight(path_name: str):
+    """Handle CORS preflight requests"""
+    return Response(
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+            "Access-Control-Allow-Headers": "*",
+        }
+    )
 
 
 @router.get("/makes")
@@ -16,7 +28,7 @@ def get_all_makes(db: Session = Depends(get_db)):
     """Get all available car makes"""
     makes = db.query(Make).all()
     make_names = sorted([make.name for make in makes])
-    return {"makes": make_names}
+    return make_names
 
 
 @router.get("/models")
@@ -25,10 +37,10 @@ def get_models_by_make(make: str = Query(..., description="Car make"), db: Sessi
     make_obj = db.query(Make).filter(Make.name == make).first()
     
     if not make_obj:
-        return {"make": make, "models": []}
+        return []
     
     models = sorted([model.name for model in make_obj.models])
-    return {"make": make, "models": models}
+    return models
 
 
 @router.get("/trims")
