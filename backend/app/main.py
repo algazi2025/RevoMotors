@@ -1,9 +1,5 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-import logging
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
@@ -15,37 +11,35 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Minimal car database - preloaded in memory
-MAKES = ["Acura", "Alfa Romeo", "Aston Martin", "Audi", "Bentley", "BMW", "Bugatti", "Buick", "Cadillac", "Chevrolet", "Chrysler", "Citroen", "Dodge", "Ferrari", "Fiat", "Ford", "Genesis", "GMC", "Honda", "Hyundai", "Infiniti", "Jaguar", "Jeep", "Kia", "Koenigsegg", "Lamborghini", "Lancia", "Land Rover", "Lexus", "Lincoln", "Lucid", "Maserati", "Mazda", "McLaren", "Mercedes-Benz", "Mini", "Mitsubishi", "Nissan", "Peugeot", "Polestar", "Porsche", "Ram", "Renault", "Rivian", "Rolls-Royce", "Saab", "Subaru", "Suzuki", "Tata", "Tesla", "Toyota", "Volkswagen", "Volvo", "Xpeng"]
+MAKES = ["Acura", "Audi", "BMW", "Chevrolet", "Dodge", "Ford", "Honda", "Hyundai", "Jeep", "Kia", "Lexus", "Mercedes-Benz", "Nissan", "Porsche", "Ram", "Subaru", "Tesla", "Toyota", "Volkswagen", "Volvo"]
 
 MODELS = {
-    "Acura": ["MDX", "RDX", "TLX", "ILX"],
-    "Audi": ["A3", "A4", "A6", "Q3", "Q5", "Q7"],
+    "Acura": ["MDX", "RDX", "TLX"],
+    "Audi": ["A3", "A4", "A6", "Q3", "Q5"],
     "BMW": ["3 Series", "5 Series", "X3", "X5"],
-    "Chevrolet": ["Blazer", "Malibu", "Silverado", "Tahoe", "Traverse"],
-    "Dodge": ["Charger", "Challenger", "Durango", "Journey"],
-    "Ford": ["Edge", "Escape", "Explorer", "F-150", "Mustang", "Ranger"],
-    "Honda": ["Accord", "Civic", "CR-V", "Pilot", "Odyssey"],
-    "Hyundai": ["Elantra", "Sonata", "Tucson", "Santa Fe", "Kona"],
-    "Jeep": ["Cherokee", "Compass", "Grand Cherokee", "Wrangler"],
-    "Kia": ["Forte", "Niro", "Optima", "Sportage", "Telluride"],
-    "Lexus": ["ES", "IS", "RX", "GX", "LS"],
-    "Mercedes-Benz": ["C-Class", "E-Class", "GLC", "S-Class"],
-    "Nissan": ["Altima", "Leaf", "Maxima", "Murano", "Rogue", "Sentra"],
-    "Porsche": ["911", "Cayenne", "Macan"],
-    "Ram": ["1500", "2500", "Promaster"],
-    "Subaru": ["Ascent", "BRZ", "Crosstrek", "Forester", "Legacy", "Outback"],
-    "Tesla": ["Model 3", "Model S", "Model X", "Model Y"],
-    "Toyota": ["Camry", "Corolla", "RAV4", "Highlander", "Prius", "4Runner", "Tacoma", "Tundra", "Sienna"],
-    "Volkswagen": ["Golf", "Jetta", "Passat", "Tiguan", "Atlas", "ID.4"],
-    "Volvo": ["S60", "S90", "XC60", "XC90"],
+    "Chevrolet": ["Malibu", "Silverado", "Traverse"],
+    "Dodge": ["Charger", "Challenger", "Durango"],
+    "Ford": ["F-150", "Mustang", "Explorer"],
+    "Honda": ["Accord", "Civic", "CR-V", "Pilot"],
+    "Hyundai": ["Elantra", "Sonata", "Tucson"],
+    "Jeep": ["Cherokee", "Grand Cherokee", "Wrangler"],
+    "Kia": ["Forte", "Sportage", "Telluride"],
+    "Lexus": ["ES", "IS", "RX"],
+    "Mercedes-Benz": ["C-Class", "E-Class", "S-Class"],
+    "Nissan": ["Altima", "Rogue", "Sentra"],
+    "Porsche": ["911", "Cayenne"],
+    "Ram": ["1500", "2500"],
+    "Subaru": ["Forester", "Legacy", "Outback"],
+    "Tesla": ["Model 3", "Model S", "Model Y"],
+    "Toyota": ["Camry", "Corolla", "RAV4", "Tundra"],
+    "Volkswagen": ["Golf", "Jetta", "Passat"],
+    "Volvo": ["S90", "XC90"],
 }
 
 TRIMS = {
-    "Acura|MDX": ["Standard", "Technology", "A-Spec"],
-    "Audi|A3": ["Standard", "Premium", "Prestige"],
-    "Audi|A4": ["Standard", "Premium", "Prestige"],
-    "BMW|3 Series": ["318i", "320i", "330i", "340i"],
+    "Acura|MDX": ["Standard", "Technology"],
+    "Audi|A3": ["Standard", "Premium"],
+    "BMW|3 Series": ["318i", "320i", "330i"],
     "Chevrolet|Malibu": ["L", "LT", "RS"],
     "Chevrolet|Silverado": ["RST", "LTZ"],
     "Dodge|Charger": ["SE", "SXT", "R/T"],
@@ -54,37 +48,49 @@ TRIMS = {
     "Honda|Accord": ["LX", "Sport", "EX"],
     "Honda|Civic": ["LX", "Sport", "EX"],
     "Honda|CR-V": ["LX", "EX", "EX-L"],
+    "Honda|Pilot": ["LX", "EX", "Touring"],
     "Hyundai|Elantra": ["SE", "SEL", "Limited"],
+    "Hyundai|Sonata": ["SE", "SEL", "Limited"],
     "Hyundai|Tucson": ["SE", "SEL", "Limited"],
     "Jeep|Cherokee": ["Sport", "Latitude"],
     "Jeep|Grand Cherokee": ["Laredo", "Limited"],
     "Jeep|Wrangler": ["Sport", "Sahara"],
     "Kia|Forte": ["FE", "LX", "S"],
     "Kia|Sportage": ["LX", "S", "EX"],
+    "Kia|Telluride": ["LX", "EX"],
     "Lexus|ES": ["250", "350"],
     "Lexus|IS": ["300", "350"],
     "Lexus|RX": ["350", "Hybrid"],
     "Mercedes-Benz|C-Class": ["C300", "C43 AMG"],
+    "Mercedes-Benz|E-Class": ["E350", "E450"],
+    "Mercedes-Benz|S-Class": ["S500", "S580"],
     "Nissan|Altima": ["S", "SV", "SL"],
     "Nissan|Rogue": ["S", "SV"],
+    "Nissan|Sentra": ["S", "SV"],
     "Porsche|911": ["Carrera", "Turbo"],
+    "Porsche|Cayenne": ["Base", "S"],
+    "Ram|1500": ["Tradesman", "SLT"],
+    "Ram|2500": ["Tradesman", "SLT"],
     "Subaru|Forester": ["Base", "Premium"],
     "Subaru|Legacy": ["Base", "Premium"],
-    "Tesla|Model 3": ["Standard Range", "Long Range"],
+    "Subaru|Outback": ["Base", "Premium"],
+    "Tesla|Model 3": ["Standard", "Long Range"],
     "Tesla|Model S": ["Long Range", "Performance"],
+    "Tesla|Model Y": ["RWD", "Long Range"],
     "Toyota|Camry": ["LE", "SE", "XLE"],
     "Toyota|Corolla": ["L", "LE", "SE"],
-    "Toyota|RAV4": ["LE", "XLE", "Adventure"],
+    "Toyota|RAV4": ["LE", "XLE"],
     "Toyota|Tundra": ["SR", "SR5"],
-    "Volkswagen|Golf": ["S", "SE", "SEL"],
-    "Volkswagen|Jetta": ["S", "SE", "SEL"],
+    "Volkswagen|Golf": ["S", "SE"],
+    "Volkswagen|Jetta": ["S", "SE"],
+    "Volkswagen|Passat": ["S", "SE"],
     "Volvo|S90": ["Momentum", "Inscription"],
     "Volvo|XC90": ["Momentum", "Inscription"],
 }
 
 @app.get("/")
 def root():
-    return {"status": "ready", "service": "RevoMotors API"}
+    return {"status": "ready"}
 
 @app.get("/health")
 def health():
@@ -107,26 +113,27 @@ def get_trims(make: str, model: str):
 def decode_vin(vin: str):
     """Decode VIN using NHTSA API"""
     try:
+        # Lazy import - only import when needed
         import requests
         
-        if not vin or len(vin) < 17:
+        vin = vin.strip().upper() if vin else ""
+        
+        if len(vin) < 17:
             return {"error": "Invalid VIN"}
         
-        response = requests.get(
-            f"https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVin/{vin}?format=json",
-            timeout=5
-        )
+        url = f"https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVin/{vin}?format=json"
+        resp = requests.get(url, timeout=5)
         
-        if response.status_code != 200:
-            return {"error": "Failed to decode"}
+        if resp.status_code != 200:
+            return {"error": "Failed"}
         
-        data = response.json()
+        data = resp.json()
         results = data.get("Results", [])
         
         decoded = {}
-        for result in results:
-            var = result.get("Variable", "")
-            val = result.get("Value", "")
+        for r in results:
+            var = r.get("Variable", "")
+            val = r.get("Value", "")
             
             if var == "Model Year" and val:
                 decoded["year"] = val
@@ -148,4 +155,4 @@ def decode_vin(vin: str):
         return decoded
         
     except Exception as e:
-        return {"error": str(e)}
+        return {"error": "VIN decode failed"}
