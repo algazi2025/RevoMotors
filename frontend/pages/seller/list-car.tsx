@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 
 export default function ListCar() {
-  const [form, setForm] = useState({vin: '', year: '', make: '', model: '', trim: '', mileage: '', color: '', transmission: 'automatic', fuelType: 'gasoline', titleStatus: 'clean', accidentHistory: 'none', numOwners: '1', description: '', askingPrice: ''});
+  const [form, setForm] = useState({vin: '', year: '', make: '', model: '', trim: '', mileage: '', color: '', transmission: 'automatic', fuelType: 'gasoline', titleStatus: 'clean', accidentHistory: 'none', description: '', askingPrice: ''});
   const [trims, setTrims] = useState<string[]>([]);
   const [colors, setColors] = useState<string[]>([]);
   const [makes, setMakes] = useState<string[]>([]);
@@ -13,7 +13,7 @@ export default function ListCar() {
   const YEARS = Array.from({length: 36}, (_, i) => (2025 - i).toString());
 
   useEffect(() => {
-    fetch(`${API}/api/cars/colors`).then(r => r.json()).then(d => setColors(d || [])).catch(() => {});
+    fetch(`${API}/api/cars/colors`).then(r => r.json()).then(d => setColors(d || [])).catch(() => setColors([]));
   }, []);
 
   useEffect(() => {
@@ -32,22 +32,12 @@ export default function ListCar() {
   }, [form.make, form.model, form.year]);
 
   const handleVINBlur = async (vin: string) => {
-    if (vin.length !== 17) {
-      setVinDecoded(false);
-      return;
-    }
+    if (vin.length !== 17) {setVinDecoded(false); return;}
     try {
       const res = await fetch(`${API}/api/cars/decode-vin?vin=${vin}`);
       const data = await res.json();
-      
       if (data.Make && data.model && data.year) {
-        setForm(prev => ({
-          ...prev, 
-          year: data.year, 
-          make: data.Make, 
-          model: data.model, 
-          fuelType: data.fuelType || 'gasoline'
-        }));
+        setForm(prev => ({...prev, year: data.year, make: data.Make, model: data.model, fuelType: data.fuelType || 'gasoline'}));
         setVinDecoded(true);
       } else {
         setVinDecoded(false);
@@ -64,12 +54,12 @@ export default function ListCar() {
       const res = await fetch(`${API}/api/leads/webhook/lead_received`, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({vin: form.vin, year: form.year, make: form.make, model: form.model, trim: form.trim, mileage: parseInt(form.mileage) || 0, color: form.color, transmission: form.transmission, fuelType: form.fuelType, titleStatus: form.titleStatus, accidentHistory: form.accidentHistory, numOwners: parseInt(form.numOwners) || 1, askingPrice: parseInt(form.askingPrice) || 0, description: form.description}),
+        body: JSON.stringify({vin: form.vin, year: form.year, make: form.make, model: form.model, trim: form.trim, mileage: parseInt(form.mileage) || 0, color: form.color, transmission: form.transmission, fuelType: form.fuelType, titleStatus: form.titleStatus, accidentHistory: form.accidentHistory, askingPrice: parseInt(form.askingPrice) || 0, description: form.description}),
       });
       const result = await res.json();
       if (result.success) {
         alert('✓ Success! ID: ' + result.listing_id);
-        setForm({vin: '', year: '', make: '', model: '', trim: '', mileage: '', color: '', transmission: 'automatic', fuelType: 'gasoline', titleStatus: 'clean', accidentHistory: 'none', numOwners: '1', description: '', askingPrice: ''});
+        setForm({vin: '', year: '', make: '', model: '', trim: '', mileage: '', color: '', transmission: 'automatic', fuelType: 'gasoline', titleStatus: 'clean', accidentHistory: 'none', description: '', askingPrice: ''});
         setVinDecoded(false);
       } else {
         alert('Error: ' + (result.error || 'Failed'));
@@ -88,20 +78,12 @@ export default function ListCar() {
       <h1 style={{fontSize: '32px', marginBottom: '32px'}}>🚗 Vehicle Information</h1>
       <form onSubmit={handleSubmit} style={{display: 'flex', flexDirection: 'column', gap: '20px'}}>
         
-        {/* VIN Number */}
         <div>
           <label style={st.l}>VIN Number</label>
-          <input 
-            style={{...st.i, cursor: 'text'}} 
-            type="text" 
-            value={form.vin} 
-            onChange={(e) => {setForm({...form, vin: e.target.value}); setVinDecoded(false);}} 
-            onBlur={(e) => handleVINBlur(e.target.value)} 
-          />
+          <input style={{...st.i, cursor: 'text'}} type="text" value={form.vin} onChange={(e) => {setForm({...form, vin: e.target.value}); setVinDecoded(false);}} onBlur={(e) => handleVINBlur(e.target.value)} />
           {vinDecoded && <p style={{color: 'green', fontSize: '12px', marginTop: '4px'}}>✓ Decoded</p>}
         </div>
 
-        {/* Year */}
         <div>
           <label style={st.l}>Year *</label>
           {vinDecoded ? (
@@ -116,7 +98,6 @@ export default function ListCar() {
           )}
         </div>
 
-        {/* Make */}
         <div>
           <label style={st.l}>Make *</label>
           {vinDecoded ? (
@@ -131,7 +112,6 @@ export default function ListCar() {
           )}
         </div>
 
-        {/* Model */}
         <div>
           <label style={st.l}>Model *</label>
           {vinDecoded ? (
@@ -146,7 +126,6 @@ export default function ListCar() {
           )}
         </div>
 
-        {/* Trim */}
         <div>
           <label style={st.l}>Trim</label>
           <select style={st.i} value={form.trim} onChange={(e) => setForm({...form, trim: e.target.value})} disabled={!form.model}>
