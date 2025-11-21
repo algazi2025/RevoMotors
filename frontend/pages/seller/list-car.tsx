@@ -11,20 +11,28 @@ export default function ListCar() {
   const API = 'https://revomotors.onrender.com';
   const YEARS = Array.from({length: 36}, (_, i) => (2025 - i).toString());
 
+  // Load colors on mount
   useEffect(() => {
-    fetch(`${API}/api/cars/makes`).then(r => r.json()).then(d => setMakes(d || [])).catch(() => {});
     fetch(`${API}/api/cars/colors`).then(r => r.json()).then(d => setColors(d || [])).catch(() => {});
   }, []);
 
+  // Load makes when year changes
   useEffect(() => {
-    if (!form.make) {setModels([]); return;}
-    fetch(`${API}/api/cars/models?make=${form.make}`).then(r => r.json()).then(d => setModels(d || [])).catch(() => {});
-  }, [form.make]);
+    if (!form.year) {setMakes([]); return;}
+    fetch(`${API}/api/cars/makes?year=${form.year}`).then(r => r.json()).then(d => setMakes(d || [])).catch(() => setMakes([]));
+  }, [form.year]);
 
+  // Load models when year or make changes
   useEffect(() => {
-    if (!form.make || !form.model) {setTrims([]); return;}
-    fetch(`${API}/api/cars/trims?make=${form.make}&model=${form.model}`).then(r => r.json()).then(d => setTrims(d || [])).catch(() => {});
-  }, [form.make, form.model]);
+    if (!form.make || !form.year) {setModels([]); return;}
+    fetch(`${API}/api/cars/models?make=${form.make}&year=${form.year}`).then(r => r.json()).then(d => setModels(d || [])).catch(() => setModels([]));
+  }, [form.make, form.year]);
+
+  // Load trims when year, make, or model changes
+  useEffect(() => {
+    if (!form.make || !form.model || !form.year) {setTrims([]); return;}
+    fetch(`${API}/api/cars/trims?make=${form.make}&model=${form.model}&year=${form.year}`).then(r => r.json()).then(d => setTrims(d || [])).catch(() => setTrims([]));
+  }, [form.make, form.model, form.year]);
 
   const handleVINDecode = async (vin: string) => {
     if (vin.length !== 17) return;
