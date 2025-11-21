@@ -3,6 +3,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
 import requests
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
@@ -31,13 +35,6 @@ class LeadData(BaseModel):
     description: Optional[str] = None
 
 COLORS = ["Pearl White", "Black", "Silver", "Gray", "White", "Red", "Blue", "Brown", "Gold", "Green", "Orange", "Yellow", "Beige", "Charcoal", "Midnight Blue", "Burgundy", "Tan", "Ivory", "Navy", "Slate"]
-
-VIN_DATABASE = {
-    "KNDMC5C16J6368353": {"year": "2018", "Make": "Kia", "model": "Sedona", "fuelType": "gasoline"},
-    "5TDJKRFH0LS123456": {"year": "2020", "Make": "Toyota", "model": "Sienna", "fuelType": "hybrid"},
-    "JT2BF18K5M0200000": {"year": "2021", "Make": "Toyota", "model": "Corolla", "fuelType": "gasoline"},
-    "1HGCM82633A123456": {"year": "2019", "Make": "Honda", "model": "Accord", "fuelType": "gasoline"},
-}
 
 MAKES_BY_YEAR = {
     "Acura": (1986, 2025), "Alfa Romeo": (1910, 2025), "Aston Martin": (1913, 2025), "Audi": (1968, 2025), "Bentley": (1919, 2025),
@@ -140,14 +137,55 @@ def get_colors():
 def decode_vin(vin: str):
     try:
         vin = vin.strip().upper() if vin else ""
+        
         if len(vin) < 17:
-            return {"error": "Invalid VIN length"}
+            return {"error": "Invalid VIN - must be 17 characters"}
         
-        if vin in VIN_DATABASE:
-            return VIN_DATABASE[vin]
+        # Try NHTSA API
+        try:
+            logger.info(f"Attempting to decode VIN: {vin}")
+            url = f"https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVin/{vin}?format=json"
+            response = requests.get(url, timeout=5)
+            logger.info(f"NHTSA response status: {response.status_code}")
+            
+            if response.status_code == 200:
+                data = response.json()
+                results = data.get("Results", [])
+                logger.info(f"NHTSA results: {results}")
+                
+                decoded = {}
+                for r in results:
+                    var = r.get("Variable", "")
+                    val = r.get("Value", "")
+                    
+                    if var == "Model Year" and val:
+                        decoded["year"] = val
+                    elif var == "Make" and val:
+                        decoded["Make"] = val
+                    elif var == "Model" and val:
+                        decoded["model"] = val
+                    elif var == "Fuel Type - Primary" and val:
+                        fuel = val.lower()
+                        if "gasoline" in fuel:
+                            decoded["fuelType"] = "gasoline"
+                        elif "diesel" in fuel:
+                            decoded["fuelType"] = "diesel"
+                        elif "hybrid" in fuel:
+                            decoded["fuelType"] = "hybrid"
+                        elif "electric" in fuel:
+                            decoded["fuelType"] = "electric"
+                
+                if decoded and "year" in decoded and "Make" in decoded and "model" in decoded:
+                    logger.info(f"Successfully decoded: {decoded}")
+                    return decoded
+        except Exception as e:
+            logger.error(f"NHTSA API error: {e}")
+            pass
         
-        return {"error": "VIN not found"}
+        return {"error": "VIN not found - please select Year, Make, Model manually"}
+        
     except Exception as e:
+        logger.error(f"VIN decode error: {e}")
         return {"error": str(e)}
 
 @app.post("/api/leads/webhook/lead_received")
