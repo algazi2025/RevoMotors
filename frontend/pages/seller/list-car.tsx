@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 
 export default function ListCar() {
-  const [form, setForm] = useState({year: '', make: '', model: '', trim: '', mileage: '', color: '', transmission: 'automatic', fuelType: 'gasoline', titleStatus: 'clean', accidentHistory: 'none', numOwners: '1', description: '', askingPrice: ''});
+  const [form, setForm] = useState({vin: '', year: '', make: '', model: '', trim: '', mileage: '', color: '', transmission: 'automatic', fuelType: 'gasoline', titleStatus: 'clean', accidentHistory: 'none', numOwners: '1', description: '', askingPrice: ''});
   const [trims, setTrims] = useState<string[]>([]);
   const [colors, setColors] = useState<string[]>([]);
   const [makes, setMakes] = useState<string[]>([]);
@@ -26,6 +26,17 @@ export default function ListCar() {
     fetch(`${API}/api/cars/trims?make=${form.make}&model=${form.model}`).then(r => r.json()).then(d => setTrims(d || [])).catch(() => {});
   }, [form.make, form.model]);
 
+  const handleVINDecode = async (vin: string) => {
+    if (vin.length !== 17) return;
+    try {
+      const res = await fetch(`${API}/api/cars/decode-vin?vin=${vin}`);
+      const data = await res.json();
+      if (data.Make && data.model && data.year) {
+        setForm(prev => ({...prev, year: data.year, make: data.Make, model: data.model, fuelType: data.fuelType || 'gasoline'}));
+      }
+    } catch (e) {}
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -33,12 +44,12 @@ export default function ListCar() {
       const res = await fetch(`${API}/api/leads/webhook/lead_received`, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({vin: '', year: form.year, make: form.make, model: form.model, trim: form.trim, mileage: parseInt(form.mileage) || 0, color: form.color, transmission: form.transmission, fuelType: form.fuelType, titleStatus: form.titleStatus, accidentHistory: form.accidentHistory, numOwners: parseInt(form.numOwners) || 1, askingPrice: parseInt(form.askingPrice) || 0, description: form.description}),
+        body: JSON.stringify({vin: form.vin, year: form.year, make: form.make, model: form.model, trim: form.trim, mileage: parseInt(form.mileage) || 0, color: form.color, transmission: form.transmission, fuelType: form.fuelType, titleStatus: form.titleStatus, accidentHistory: form.accidentHistory, numOwners: parseInt(form.numOwners) || 1, askingPrice: parseInt(form.askingPrice) || 0, description: form.description}),
       });
       const result = await res.json();
       if (result.success) {
         alert('✓ Success! ID: ' + result.listing_id);
-        setForm({year: '', make: '', model: '', trim: '', mileage: '', color: '', transmission: 'automatic', fuelType: 'gasoline', titleStatus: 'clean', accidentHistory: 'none', numOwners: '1', description: '', askingPrice: ''});
+        setForm({vin: '', year: '', make: '', model: '', trim: '', mileage: '', color: '', transmission: 'automatic', fuelType: 'gasoline', titleStatus: 'clean', accidentHistory: 'none', numOwners: '1', description: '', askingPrice: ''});
       } else {
         alert('Error: ' + (result.error || 'Failed'));
       }
@@ -56,6 +67,12 @@ export default function ListCar() {
       <h1 style={{fontSize: '32px', marginBottom: '32px'}}>🚗 Vehicle Information</h1>
       <form onSubmit={handleSubmit} style={{display: 'flex', flexDirection: 'column', gap: '20px'}}>
         
+        {/* VIN Number */}
+        <div>
+          <label style={st.l}>VIN Number</label>
+          <input style={{...st.i, cursor: 'text'}} type="text" value={form.vin} onChange={(e) => setForm({...form, vin: e.target.value})} onBlur={(e) => handleVINDecode(e.target.value)} />
+        </div>
+
         {/* Year - First step */}
         <div>
           <label style={st.l}>Year *</label>
