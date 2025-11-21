@@ -1,11 +1,17 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import logging
 import requests
+from typing import List, Dict
 
-app = FastAPI(title="RevoMotors API")
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-# CORS Middleware - MUST be first
+# Create app
+app = FastAPI(title="RevoMotors API", version="1.0.0")
+
+# Add CORS middleware FIRST
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -14,124 +20,145 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-# Comprehensive car database - 50+ makes, 300+ models
-CAR_DATA = {
-    "Acura": {"MDX": ["Standard", "Technology", "A-Spec"], "RDX": ["Standard", "Technology", "A-Spec"], "TLX": ["Standard", "Technology", "A-Spec"], "ILX": ["Standard", "Technology"], "NSX": ["Base"], "TSX": ["Base", "Tech"]},
-    "Alfa Romeo": {"Giulia": ["Standard", "Ti", "Quadrifoglio"], "Stelvio": ["Standard", "Ti", "Quadrifoglio"], "4C": ["Base", "Spider"]},
-    "Aston Martin": {"DB11": ["Base", "AMR"], "Vantage": ["Base", "AMR"], "Rapide": ["S"], "DBX": ["Base", "AMR"]},
-    "Audi": {"A1": ["Standard", "Premium"], "A3": ["Standard", "Premium", "Prestige"], "A4": ["Standard", "Premium", "Prestige", "S4"], "A5": ["Standard", "Premium", "S5"], "A6": ["Premium", "Prestige", "S6"], "A7": ["Premium", "Prestige", "S7"], "A8": ["Standard", "Premium", "S8"], "Q2": ["Standard", "Premium"], "Q3": ["Standard", "Premium", "Prestige"], "Q4": ["Standard", "Premium"], "Q5": ["Premium", "Prestige", "SQ5"], "Q7": ["Premium", "Prestige", "SQ7"], "Q8": ["Premium", "Prestige", "SQ8"], "R8": ["Coupe", "Spyder"], "TT": ["Base", "S"], "RS5": ["Coupe", "Sportback"], "RS6": ["Avant"], "RS7": ["Sportback"]},
-    "Bentley": {"Continental": ["GT", "Flying Spur"], "Mulsanne": ["Speed"], "Bentayga": ["Base", "Speed"]},
-    "BMW": {"i3": ["Standard", "S"], "i8": ["Base", "Roadster"], "M3": ["Base", "Competition"], "M4": ["Base", "Competition"], "M440i": ["xDrive"], "1 Series": ["120i", "128i", "M135i"], "2 Series": ["220i", "228i", "M240i"], "3 Series": ["318i", "320i", "330i", "340i", "M340i", "M3"], "4 Series": ["430i", "440i", "M440i", "M4"], "5 Series": ["530i", "540i", "M550i", "M5"], "6 Series": ["640i", "650i", "M650i"], "7 Series": ["740i", "750i", "M760i"], "M550i": ["xDrive"], "X1": ["xDrive28i", "xDrive35i"], "X2": ["xDrive28i", "xDrive35i"], "X3": ["xDrive30i", "xDrive40i", "M40i", "M"], "X4": ["xDrive30i", "xDrive40i", "M40i"], "X5": ["xDrive40i", "xDrive50i", "M50i", "M"], "X6": ["xDrive40i", "xDrive50i", "M50i", "M"], "X7": ["xDrive40i", "xDrive50i", "M50i"]},
-    "Bugatti": {"Chiron": ["Base", "Speed", "Bolide"], "Veyron": ["Base", "Super Sport"]},
-    "Buick": {"Regal": ["Base", "Preferred", "GS"], "LaCrosse": ["Base", "Preferred", "Avenir"], "Envision": ["Preferred", "Essence", "Avenir"], "Encore": ["Preferred", "Essence", "Avenir"], "Enclave": ["Base", "Preferred", "Avenir"]},
-    "Cadillac": {"CT4": ["Luxury", "Premium"], "CT5": ["Luxury", "Premium", "Platinum"], "CT6": ["Base", "Luxury"], "CTS": ["Luxury", "Premium", "Platinum"], "CTS-V": ["Base"], "Escalade": ["Luxury", "Premium", "Platinum"], "Escalade ESV": ["Base", "Luxury"], "SRX": ["Base", "Luxury", "Premium"], "XT4": ["Luxury", "Premium"], "XT5": ["Luxury", "Premium", "Platinum"], "XT6": ["Luxury", "Premium", "Platinum"]},
-    "Chevrolet": {"Blazer": ["L", "LT", "RS", "Premier"], "Bolt": ["LT", "Premier"], "Camaro": ["LT", "RS", "SS", "ZL1"], "Colorado": ["Base", "LT", "Z71"], "Corvette": ["Stingray", "Z06", "ZR2"], "Cruze": ["L", "LT", "RS", "Premier"], "Equinox": ["L", "LT", "RS", "LTZ"], "Impala": ["LS", "LT", "Premier"], "Malibu": ["L", "LT", "RS", "Premier"], "Silverado": ["RST", "LTZ", "High Country"], "Sonic": ["LS", "LT", "Premier"], "Spark": ["LS", "LT", "Premier"], "Suburban": ["LS", "LT", "RST", "Premier"], "Tahoe": ["LS", "LT", "RST", "High Country"], "Traverse": ["LS", "LT", "RS", "Premier"], "Trax": ["LS", "LT", "Premier"], "Volt": ["LT", "Premier"]},
-    "Chrysler": {"300": ["Base", "Limited", "C"], "Pacifica": ["Touring", "Limited", "Pinnacle"], "Sebring": ["Base", "Limited"], "Town Country": ["Base", "Touring"]},
-    "Citroen": {"C1": ["Base", "Feel"], "C3": ["Base", "Feel", "Shine"], "C4": ["Live", "Shine", "Exclusive"], "C5": ["Base", "Live", "Shine"]},
-    "Dodge": {"Charger": ["SE", "SXT", "R/T", "SRT", "Hellcat"], "Challenger": ["SXT", "R/T", "SRT", "Hellcat"], "Dart": ["SE", "SXT", "Rallye"], "Durango": ["SXT", "R/T", "Citadel", "SRT"], "Journey": ["SE", "SXT", "R/T"], "Viper": ["Base", "ACR"]},
-    "Ferrari": {"F8 Tributo": ["Base"], "F430": ["Base", "Scuderia"], "F458": ["Italia", "Spider"], "FF": ["Base"], "GTC4": ["Lusso"], "LaFerrari": ["Base"], "Portofino": ["Base"], "SF90": ["Stradale"]},
-    "Fiat": {"500": ["Pop", "Sport", "Lounge"], "500X": ["Pop", "Sport", "Lounge"], "500L": ["Pop", "Sport", "Lounge"], "124 Spider": ["Classica", "Lusso"]},
-    "Ford": {"Edge": ["SE", "SEL", "Limited", "ST"], "Escape": ["S", "SE", "SEL", "Titanium", "ST"], "Explorer": ["Base", "XLT", "Limited", "ST", "Platinum"], "F-150": ["Regular", "SuperCrew", "SuperCab", "XL", "XLT", "Lariat", "King Ranch", "Platinum"], "Fiesta": ["S", "SE", "SES", "Titanium"], "Flex": ["SE", "SEL", "Limited"], "Focus": ["S", "SE", "SEL", "ST", "RS"], "Fusion": ["S", "SE", "SEL", "Titanium"], "GT": ["Base"], "GT40": ["Base"], "Mustang": ["EcoBoost", "GT", "Mach 1", "Shelby"], "Pinto": ["Base"], "Ranger": ["Regular", "SuperCrew", "XL", "XLT"], "Taurus": ["SE", "Limited", "SHO"], "Thunderbird": ["Base"], "Taurus": ["Base", "Limited"]},
-    "Genesis": {"G70": ["2.0T", "3.8"], "G80": ["2.0T", "3.8", "Electrified"], "G90": ["3.8", "5.0", "Electrified"], "GV70": ["2.5T", "3.8", "Electrified"], "GV80": ["2.5T", "3.8"], "Electrified GV70": ["Base"], "Electrified G80": ["Base"]},
-    "GMC": {"Acadia": ["SL", "SLE", "Denali"], "Canyon": ["Base", "SLE", "Denali"], "Sierra": ["Regular", "Double Cab", "Crew Cab", "Denali"], "Terrain": ["SL", "SLE", "SLT"], "Yukon": ["SLE", "SLT", "Denali"], "Yukon XL": ["SLE", "SLT", "Denali"]},
-    "Honda": {"Accord": ["LX", "Sport", "EX", "Touring", "Hybrid"], "Civic": ["LX", "Sport", "EX", "Touring", "Si", "Type R", "Hybrid"], "CR-V": ["LX", "EX", "EX-L", "Touring", "Hybrid"], "Fit": ["LX", "Sport", "EX"], "HR-V": ["LX", "EX", "EX-L"], "Insight": ["LX", "EX", "Touring"], "Odyssey": ["LX", "EX", "EX-L", "Touring"], "Passport": ["Sport", "EX-L", "Touring"], "Pilot": ["LX", "EX", "EX-L", "Touring", "Hybrid"], "Ridgeline": ["RT", "RTL", "RTL-E", "Black Edition"], "S2000": ["Base"]},
-    "Hyundai": {"Accent": ["SE", "SEL", "Limited"], "Elantra": ["SE", "SEL", "Limited", "N"], "Genesis": ["3.8", "5.0"], "Ioniq": ["SE", "SEL", "Limited", "Hybrid", "Plug-in Hybrid", "Electric"], "Kona": ["SE", "SEL", "Limited", "Electric"], "Palisade": ["SE", "SEL", "Limited"], "Prius": ["L", "LE", "XLE"], "Santa Fe": ["SE", "SEL", "Limited", "Calligraphy"], "Sonata": ["SE", "SEL", "Limited", "N", "Hybrid"], "Tiburon": ["Base", "SE", "Limited"], "Tucson": ["SE", "SEL", "Limited", "N Line"], "Venue": ["SE", "SEL", "Limited"]},
-    "Infiniti": {"Q30": ["Base", "Premium"], "Q50": ["Pure", "Luxe", "Red Sport", "Eau Rouge"], "Q60": ["Pure", "Luxe", "Red Sport"], "Q70": ["Base", "Premium", "Signature"], "Q80": ["Base", "Signature", "Premium"], "QX30": ["Base", "Premium"], "QX50": ["Pure", "Luxe", "Essential"], "QX60": ["Base", "Luxury"], "QX80": ["Base", "Luxury", "Platinum"], "QX90": ["Base", "Luxury"]},
-    "Jaguar": {"F-Pace": ["Base", "Premium", "R-Sport", "SVR"], "F-Type": ["Base", "R", "SVR"], "I-Pace": ["Base", "SE", "HSE"], "XE": ["Base", "Premium", "R-Sport", "SVR"], "XF": ["Base", "Premium", "R-Sport", "SVR"], "XJ": ["Base", "Premium", "Supersport"]},
-    "Jeep": {"Cherokee": ["Sport", "Latitude", "Trailhawk", "High Altitude"], "Compass": ["Sport", "Latitude", "Limited", "Trailhawk"], "Gladiator": ["Sport", "Overland", "Rubicon"], "Grand Cherokee": ["Laredo", "Limited", "Trailhawk", "Summit", "High Altitude"], "Renegade": ["Sport", "Latitude", "Limited", "Trailhawk"], "Wrangler": ["Sport", "Sahara", "Rubicon", "Unlimited"]},
-    "Kia": {"Forte": ["FE", "LX", "S", "EX", "GT"], "K5": ["LX", "EX", "SX"], "Niro": ["LX", "EX", "SX", "Hybrid", "Plug-in Hybrid"], "Optima": ["LX", "EX", "SX"], "Rio": ["FE", "LX", "S", "EX"], "Seltos": ["LX", "EX", "SX"], "Sorento": ["L", "LX", "EX", "SX"], "Sportage": ["LX", "S", "EX", "SX"], "Stinger": ["Base", "GT", "GT2"], "Telluride": ["LX", "EX", "SX", "Limited"]},
-    "Koenigsegg": {"Agera": ["Base", "RS", "RR"], "Gemera": ["Base"], "Jesko": ["Base", "Attack"]},
-    "Lamborghini": {"Aventador": ["Base", "S", "SV", "SVJ"], "Huracán": ["Base", "Performante", "Sterrato"], "Murciélago": ["Base", "LP640"], "Revuelto": ["Base"], "Urus": ["Base", "S", "Performante"]},
-    "Lancia": {"Delta": ["Base", "HF"], "Ypsilon": ["Base", "Gold"], "Thema": ["Base", "Platino"]},
-    "Land Rover": {"Discovery": ["SE", "HSE", "Landmark"], "Discovery Sport": ["SE", "HSE", "R-Dynamic"], "Range Rover": ["Base", "Sport", "Vogue"], "Range Rover Evoque": ["Base", "HSE", "R-Dynamic"], "Range Rover Sport": ["SE", "HSE", "SVR"], "Range Rover Velar": ["Base", "HSE", "R-Dynamic"]},
-    "Lexus": {"CT": ["200h", "200h F Sport"], "ES": ["250", "350", "Hybrid", "F"], "GS": ["350", "Hybrid", "F"], "GX": ["460", "550", "Luxury"], "IS": ["300", "350", "F", "Hybrid"], "LC": ["500", "Hybrid"], "LS": ["500", "Hybrid", "F"], "LX": ["570", "Hybrid"], "NX": ["250", "350", "Hybrid", "F Sport"], "RC": ["300", "350", "F"], "RX": ["350", "Hybrid", "L", "Plug-in Hybrid"], "UX": ["200", "250h", "Hybrid"]},
-    "Lincoln": {"Aviator": ["Premiere", "Select", "Reserve", "Black Label"], "Corsair": ["Premiere", "Select", "Reserve"], "MKZ": ["Premiere", "Select", "Reserve", "Black Label"], "MKX": ["Premiere", "Select", "Reserve"], "Navigator": ["Premiere", "Select", "Reserve", "Black Label"], "Town Car": ["Base", "Signature"]},
-    "Lucid": {"Air": ["Pure", "Touring", "Grand Touring", "Sapphire"]},
-    "Maserati": {"Ghibli": ["Base", "S", "Trofeo"], "Levante": ["Base", "S", "Trofeo"], "Quattroporte": ["Base", "S", "Trofeo"], "MC20": ["Base"]},
-    "Mazda": {"CX-3": ["Sport", "Touring", "Grand Touring"], "CX-30": ["Base", "Select", "Preferred"], "CX-50": ["Base", "Select", "Preferred"], "CX-5": ["Base", "Select", "Preferred", "Premium"], "CX-9": ["Base", "Select", "Preferred", "Premium"], "Mazda2": ["Sport", "Select", "Preferred"], "Mazda3": ["Base", "Select", "Preferred", "Premium"], "Mazda6": ["Base", "Select", "Preferred", "Premium"], "MX-5 Miata": ["Sport", "Club", "Grand Touring"], "MX-30": ["Base", "Select"]},
-    "McLaren": {"570GT": ["Base"], "570S": ["Base"], "650S": ["Base"], "720S": ["Base", "Performance"], "765LT": ["Base"], "GT": ["Base"]},
-    "Mercedes-Benz": {"A-Class": ["A220", "A250", "AMG A35"], "AMG C63": ["Base"], "AMG G63": ["Base"], "AMG GT": ["Base", "R", "Black Series"], "B-Class": ["B250", "AMG B35"], "C-Class": ["C300", "C43 AMG", "C63 AMG"], "CLA": ["Base", "250", "AMG"], "CLS": ["450", "AMG 53"], "E-Class": ["E350", "E450", "E53 AMG", "E63 AMG"], "EQC": ["Base", "AMG"], "EQE": ["Base", "AMG"], "EQS": ["Base", "AMG"], "G-Class": ["G550", "AMG G63", "AMG G63 AMG"], "GLA": ["GLA250", "AMG GLA35"], "GLB": ["GLB250", "AMG GLB35"], "GLC": ["GLC300", "GLC43 AMG", "GLC63 AMG"], "GLE": ["GLE350", "GLE450", "AMG GLE53"], "GLK": ["Base"], "GLS": ["GLS450", "AMG GLS53"], "S-Class": ["S500", "S580", "AMG S63"], "SL": ["Base", "AMG"]},
-    "Mini": {"Clubman": ["Base", "Cooper", "Cooper S"], "Countryman": ["Base", "Cooper", "Cooper S"], "Hardtop": ["Base", "Cooper", "Cooper S"], "Paceman": ["Base", "Cooper"], "Roadster": ["Base", "Cooper"]},
-    "Mitsubishi": {"Diamante": ["Base"], "Eclipse": ["Base", "Cross"], "Galant": ["Base"], "Lancer": ["ES", "SEL", "Ralliart"], "Mirage": ["Base", "ES", "SEL"], "Outlander": ["ES", "SEL", "Limited", "Hybrid"], "Pajero": ["Base", "Exceed"], "i-MiEV": ["Base", "SE"]},
-    "Nissan": {"Altima": ["S", "SV", "SL", "Platinum"], "Ariya": ["Base", "Plus", "Pro"], "Frontier": ["S", "SV", "SL"], "GT-R": ["Base", "Premium", "Track Edition"], "Leaf": ["S", "SV", "SL", "Plus"], "Maxima": ["S", "SV", "SL", "Platinum"], "Murano": ["S", "SV", "SL", "Platinum", "Hybrid"], "Pathfinder": ["S", "SV", "SL", "Platinum"], "Qashqai": ["Base", "SV", "SL"], "Rogue": ["S", "SV", "SL", "Platinum"], "Sentra": ["S", "SV", "SR", "SL"], "Titan": ["Single Cab", "Crew Cab", "XD"], "Versa": ["S", "SV", "SR", "SL"], "Z": ["Base", "Performance"]},
-    "Peugeot": {"108": ["Active", "Allure"], "208": ["Active", "Allure", "GT"], "308": ["Active", "Allure", "GT"], "3008": ["Active", "Allure", "GT"], "5008": ["Active", "Allure", "GT"], "Expert": ["Base"], "Partner": ["Base"]},
-    "Polestar": {"1": ["Base"], "2": ["Standard Range", "Long Range", "Performance"], "3": ["Base"], "4": ["Base"]},
-    "Porsche": {"718 Boxster": ["Base", "S", "GTS"], "718 Cayman": ["Base", "S", "GTS"], "911": ["Carrera", "Carrera 4", "Turbo", "GT"], "Panamera": ["Base", "4", "Turbo"], "Cayenne": ["Base", "S", "Turbo", "E-Hybrid"], "Macan": ["Base", "S", "Turbo"], "Taycan": ["Base", "4", "Turbo", "Cross Turismo"]},
-    "Ram": {"1500": ["Tradesman", "SLT", "Laramie", "Rebel", "Tungsten"], "2500": ["Tradesman", "Power Wagon", "Laramie", "Mega Cab"], "3500": ["Tradesman", "SLT", "Laramie"], "Promaster": ["City", "Cargo", "Window"]},
-    "Renault": {"Clio": ["Base", "Interactive"], "Espace": ["Base", "Dynamique"], "Kangoo": ["Base", "Sport"], "Laguna": ["Base", "Dynamique"], "Megane": ["Base", "Dynamique"], "Scenic": ["Base", "Dynamique"], "Zoe": ["Base", "Dynamique"]},
-    "Rivian": {"R1S": ["Dual Motor", "Quad Motor", "Tri Motor"], "R1T": ["Dual Motor", "Quad Motor", "Tri Motor"]},
-    "Rolls-Royce": {"Cullinan": ["Base", "Black Badge"], "Ghost": ["Base", "Black Badge"], "Phantom": ["Base", "Black Badge"], "Wraith": ["Base", "Black Badge"]},
-    "Saab": {"9-3": ["Base", "Sport"], "9-5": ["Base", "Aero"], "9000": ["Base"]},
-    "Subaru": {"Ascent": ["Base", "Premium", "Limited"], "BRZ": ["Base", "Premium", "Limited"], "Crosstrek": ["Base", "Premium", "Limited"], "Forester": ["Base", "Premium", "Limited"], "Impreza": ["Base", "Sport", "Limited"], "Legacy": ["Base", "Premium", "Limited"], "Outback": ["Base", "Premium", "Limited"], "SVX": ["Base"], "WRX": ["Base", "STI", "Limited"]},
-    "Suzuki": {"Alto": ["Base", "GL", "GLX"], "Celerio": ["Base", "VXi"], "Ciaz": ["Base", "VXi"], "Ertiga": ["Base", "VXi"], "Grand Vitara": ["Base", "SZ5"], "Maruti": ["800"], "S-Cross": ["Base", "ZXi"], "Swift": ["Base", "VXi", "ZXi"], "SX4": ["Base", "Hybrid"], "Vitara": ["Base", "SZ5", "AllGrip"]},
-    "Tata": {"Altroz": ["Base", "XT"], "Altroz iCNG": ["Base"], "Harrier": ["XE", "XM"], "Hexa": ["XE", "XM"], "Nexon": ["XE", "XM", "EV"], "Punch": ["Base", "AMT"], "Tiago": ["Base", "XT"], "Tigor": ["Base", "XT"]},
-    "Tesla": {"Model 3": ["Standard Range", "Long Range", "Performance"], "Model S": ["Long Range", "Performance", "Plaid"], "Model X": ["Long Range", "Performance", "Plaid"], "Model Y": ["RWD", "Long Range", "Performance"], "Roadster": ["Base"], "Cybertruck": ["Base", "AWD", "Tri Motor"]},
-    "Toyota": {"4Runner": ["SR5", "TRD", "TRD Pro", "Limited"], "Avalon": ["LE", "XLE", "Limited", "Hybrid"], "bZ4X": ["Base", "Limited"], "Camry": ["LE", "SE", "XLE", "TRD", "Hybrid"], "Corolla": ["L", "LE", "SE", "XLE", "Hybrid"], "GR Supra": ["2.0", "3.0"], "GR Yaris": ["Base"], "GR Corolla": ["Base"], "GR86": ["Base", "Premium"], "Gross Countach": ["Base"], "Highlander": ["L", "LE", "XLE", "Limited", "Platinum"], "Mirai": ["LE", "XLE", "Limited"], "Prius": ["L", "LE", "XLE", "AWD-E", "Hybrid"], "Prius Prime": ["LE", "XLE"], "RAV4": ["LE", "XLE", "Adventure", "TRD", "Prime"], "Sequoia": ["SR5", "Limited", "Platinum"], "Sienna": ["LE", "XLE", "Limited"], "Tacoma": ["SR", "SR5", "TRD", "Limited"], "Tundra": ["SR", "SR5", "Limited", "Platinum"], "Venza": ["LE", "XLE", "Limited", "Hybrid"]},
-    "Volkswagen": {"Arteon": ["S", "SE", "SEL"], "Atlas": ["S", "SE", "SEL", "R-Line"], "Atlas Cross Sport": ["S", "SE", "SEL", "R-Line"], "Beetle": ["S", "SE", "SEL", "Final Edition"], "Golf": ["S", "SE", "SEL", "GTI", "R"], "Golf Alltrack": ["Base", "S", "SE"], "ID.4": ["Standard", "Pro", "Pro Max", "1st Edition"], "ID.5": ["Standard", "Pro", "Pro Max"], "ID.Buzz": ["Base", "Pro", "Pro S"], "Jetta": ["S", "SE", "SEL", "GLI"], "Passat": ["S", "SE", "SEL", "GLI"], "Rabbit": ["S", "SE"], "Taos": ["S", "SE", "SEL"], "Tiguan": ["S", "SE", "SEL", "R-Line"], "Touareg": ["Standard", "Execline"]},
-    "Volvo": {"C30": ["Base", "T5"], "C70": ["Base", "T5"], "S60": ["Momentum", "Inscription", "R-Design"], "S80": ["Base", "T6"], "S90": ["Momentum", "Inscription", "R-Design"], "V60": ["Momentum", "Inscription", "R-Design"], "V90": ["Momentum", "Inscription", "R-Design"], "XC40": ["Base", "Recharge", "R-Design"], "XC60": ["Momentum", "Inscription", "R-Design"], "XC90": ["Momentum", "Inscription", "R-Design"]},
-    "Xpeng": {"G9": ["Base", "Plus", "Max"], "P7": ["Base", "Plus", "Max"], "P8": ["Base", "Plus", "Max"]},
+# Car database
+CAR_DATA: Dict = {
+    "Acura": {"MDX": ["Standard", "Technology", "A-Spec"], "RDX": ["Standard", "Technology", "A-Spec"], "TLX": ["Standard", "Technology"], "ILX": ["Standard", "Technology"]},
+    "Alfa Romeo": {"Giulia": ["Standard", "Ti", "Quadrifoglio"], "Stelvio": ["Standard", "Ti", "Quadrifoglio"]},
+    "Aston Martin": {"DB11": ["Base", "AMR"], "Vantage": ["Base", "AMR"]},
+    "Audi": {"A3": ["Standard", "Premium", "Prestige"], "A4": ["Standard", "Premium", "Prestige"], "A6": ["Premium", "Prestige"], "Q3": ["Standard", "Premium"], "Q5": ["Premium", "Prestige"], "Q7": ["Premium", "Prestige"]},
+    "Bentley": {"Continental": ["GT", "Flying Spur"], "Mulsanne": ["Speed"]},
+    "BMW": {"3 Series": ["318i", "320i", "330i", "340i"], "5 Series": ["530i", "540i"], "X3": ["xDrive30i", "xDrive40i"], "X5": ["xDrive40i", "xDrive50i"]},
+    "Bugatti": {"Chiron": ["Base", "Speed"]},
+    "Buick": {"Regal": ["Base", "Preferred"], "Envision": ["Preferred", "Essence"], "Encore": ["Preferred", "Essence"]},
+    "Cadillac": {"CT5": ["Luxury", "Premium"], "Escalade": ["Luxury", "Premium"], "XT5": ["Luxury", "Premium"]},
+    "Chevrolet": {"Blazer": ["L", "LT", "RS"], "Malibu": ["L", "LT", "RS"], "Silverado": ["RST", "LTZ"], "Tahoe": ["LS", "LT"], "Traverse": ["LS", "LT", "RS"]},
+    "Chrysler": {"300": ["Base", "Limited"], "Pacifica": ["Touring", "Limited"]},
+    "Citroen": {"C3": ["Base", "Feel"], "C4": ["Live", "Shine"]},
+    "Dodge": {"Charger": ["SE", "SXT", "R/T"], "Challenger": ["SXT", "R/T"], "Durango": ["SXT", "R/T"], "Journey": ["SE", "SXT"]},
+    "Ferrari": {"F8 Tributo": ["Base"], "Portofino": ["Base"]},
+    "Fiat": {"500": ["Pop", "Sport"], "500X": ["Pop", "Sport"]},
+    "Ford": {"Edge": ["SE", "SEL", "Limited"], "Escape": ["S", "SE", "SEL"], "Explorer": ["Base", "XLT", "Limited"], "F-150": ["Regular", "SuperCrew", "XLT"], "Mustang": ["EcoBoost", "GT"], "Ranger": ["Regular", "SuperCrew"]},
+    "Genesis": {"G70": ["2.0T", "3.8"], "G80": ["2.0T", "3.8"], "GV70": ["2.5T", "3.8"]},
+    "GMC": {"Acadia": ["SL", "SLE"], "Sierra": ["Regular", "Crew Cab"], "Yukon": ["SLE", "SLT"]},
+    "Honda": {"Accord": ["LX", "Sport", "EX"], "Civic": ["LX", "Sport", "EX"], "CR-V": ["LX", "EX", "EX-L"], "Pilot": ["LX", "EX", "Touring"], "Odyssey": ["LX", "EX", "Touring"]},
+    "Hyundai": {"Elantra": ["SE", "SEL", "Limited"], "Sonata": ["SE", "SEL", "Limited"], "Tucson": ["SE", "SEL", "Limited"], "Santa Fe": ["SE", "SEL", "Limited"], "Kona": ["SE", "SEL", "Limited"]},
+    "Infiniti": {"Q50": ["Pure", "Luxe"], "Q60": ["Pure", "Luxe"], "QX50": ["Pure", "Luxe"], "QX80": ["Base", "Luxury"]},
+    "Jaguar": {"F-Pace": ["Base", "Premium"], "F-Type": ["Base", "R"], "XE": ["Base", "Premium"]},
+    "Jeep": {"Cherokee": ["Sport", "Latitude"], "Compass": ["Sport", "Latitude"], "Grand Cherokee": ["Laredo", "Limited"], "Wrangler": ["Sport", "Sahara"]},
+    "Kia": {"Forte": ["FE", "LX", "S"], "Niro": ["LX", "EX", "SX"], "Optima": ["LX", "EX"], "Sportage": ["LX", "S", "EX"], "Telluride": ["LX", "EX"]},
+    "Koenigsegg": {"Agera": ["Base", "RS"]},
+    "Lamborghini": {"Aventador": ["Base", "S"], "Huracán": ["Base", "Performante"]},
+    "Land Rover": {"Discovery": ["SE", "HSE"], "Range Rover": ["Base", "Sport"], "Range Rover Evoque": ["Base", "HSE"]},
+    "Lexus": {"ES": ["250", "350"], "IS": ["300", "350"], "RX": ["350", "Hybrid"], "GX": ["460", "550"], "LS": ["500", "Hybrid"]},
+    "Lincoln": {"Aviator": ["Premiere", "Select"], "Corsair": ["Premiere", "Select"], "MKZ": ["Premiere", "Select"]},
+    "Lucid": {"Air": ["Pure", "Touring"]},
+    "Maserati": {"Ghibli": ["Base", "S"], "Levante": ["Base", "S"]},
+    "Mazda": {"CX-3": ["Sport", "Touring"], "CX-5": ["Base", "Select"], "CX-9": ["Base", "Select"], "Mazda3": ["Base", "Select"], "Mazda6": ["Base", "Select"]},
+    "McLaren": {"570GT": ["Base"], "720S": ["Base"]},
+    "Mercedes-Benz": {"C-Class": ["C300", "C43 AMG"], "E-Class": ["E350", "E450"], "GLC": ["GLC300", "GLC43"], "S-Class": ["S500", "S580"]},
+    "Mini": {"Clubman": ["Base", "Cooper"], "Countryman": ["Base", "Cooper"]},
+    "Mitsubishi": {"Eclipse": ["Base", "Cross"], "Outlander": ["ES", "SEL"], "Lancer": ["ES", "SEL"]},
+    "Nissan": {"Altima": ["S", "SV", "SL"], "Leaf": ["S", "SV", "SL"], "Maxima": ["S", "SV"], "Murano": ["S", "SV"], "Pathfinder": ["S", "SV"], "Rogue": ["S", "SV"], "Sentra": ["S", "SV"]},
+    "Peugeot": {"208": ["Active", "Allure"], "308": ["Active", "Allure"], "3008": ["Active", "Allure"]},
+    "Polestar": {"2": ["Standard Range", "Long Range"]},
+    "Porsche": {"911": ["Carrera", "Turbo"], "Cayenne": ["Base", "S"], "Macan": ["Base", "S"]},
+    "Ram": {"1500": ["Tradesman", "SLT"], "2500": ["Tradesman", "SLT"], "Promaster": ["City", "Cargo"]},
+    "Renault": {"Clio": ["Base", "Interactive"], "Espace": ["Base", "Dynamique"]},
+    "Rivian": {"R1S": ["Dual Motor", "Quad Motor"], "R1T": ["Dual Motor", "Quad Motor"]},
+    "Rolls-Royce": {"Ghost": ["Base"], "Phantom": ["Base"]},
+    "Saab": {"9-3": ["Base", "Sport"], "9-5": ["Base", "Aero"]},
+    "Subaru": {"Ascent": ["Base", "Premium"], "BRZ": ["Base", "Premium"], "Crosstrek": ["Base", "Premium"], "Forester": ["Base", "Premium"], "Legacy": ["Base", "Premium"], "Outback": ["Base", "Premium"]},
+    "Suzuki": {"Swift": ["Base", "VXi"], "Vitara": ["Base", "SZ5"], "S-Cross": ["Base", "ZXi"]},
+    "Tata": {"Nexon": ["XE", "XM"], "Harrier": ["XE", "XM"]},
+    "Tesla": {"Model 3": ["Standard Range", "Long Range"], "Model S": ["Long Range", "Performance"], "Model X": ["Long Range", "Performance"], "Model Y": ["RWD", "Long Range"]},
+    "Toyota": {"Camry": ["LE", "SE", "XLE"], "Corolla": ["L", "LE", "SE"], "RAV4": ["LE", "XLE", "Adventure"], "Highlander": ["L", "LE", "XLE"], "Prius": ["L", "LE", "XLE"], "4Runner": ["SR5", "TRD"], "Tacoma": ["SR", "SR5"], "Tundra": ["SR", "SR5"], "Sienna": ["LE", "XLE"]},
+    "Volkswagen": {"Golf": ["S", "SE", "SEL"], "Jetta": ["S", "SE", "SEL"], "Passat": ["S", "SE", "SEL"], "Tiguan": ["S", "SE", "SEL"], "Atlas": ["S", "SE", "SEL"], "ID.4": ["Standard", "Pro"]},
+    "Volvo": {"S60": ["Momentum", "Inscription"], "S90": ["Momentum", "Inscription"], "XC60": ["Momentum", "Inscription"], "XC90": ["Momentum", "Inscription"]},
+    "Xpeng": {"G9": ["Base", "Plus"], "P7": ["Base", "Plus"]},
 }
 
+# Root endpoint
 @app.get("/")
-def root():
-    return {"status": "ready", "service": "RevoMotors API"}
+async def root():
+    """Root endpoint"""
+    return {"status": "ready", "service": "RevoMotors API", "version": "1.0.0"}
 
+# Health check
 @app.get("/health")
-def health():
+async def health():
+    """Health check endpoint"""
     return {"status": "healthy"}
 
+# Get all makes
 @app.get("/api/cars/makes")
-def get_makes():
+async def get_makes() -> List[str]:
     """Get all car makes"""
     try:
         makes = sorted(list(CAR_DATA.keys()))
+        logger.info(f"Returned {len(makes)} makes")
         return makes
     except Exception as e:
-        logger.error(f"Error in get_makes: {e}")
-        return {"error": str(e)}
+        logger.error(f"Error in get_makes: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error fetching makes")
 
+# Get models for a make
 @app.get("/api/cars/models")
-def get_models(make: str):
+async def get_models(make: str) -> List[str]:
     """Get models for a specific make"""
     try:
+        if not make:
+            return []
         if make not in CAR_DATA:
+            logger.warning(f"Make not found: {make}")
             return []
         models = sorted(list(CAR_DATA[make].keys()))
+        logger.info(f"Returned {len(models)} models for {make}")
         return models
     except Exception as e:
-        logger.error(f"Error in get_models: {e}")
-        return {"error": str(e)}
+        logger.error(f"Error in get_models: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error fetching models")
 
+# Get trims for a model
 @app.get("/api/cars/trims")
-def get_trims(make: str, model: str):
+async def get_trims(make: str, model: str) -> List[str]:
     """Get trims for a specific model"""
     try:
-        if make not in CAR_DATA or model not in CAR_DATA[make]:
+        if not make or not model:
             return []
-        trims = CAR_DATA[make][model]
-        return sorted(trims)
+        if make not in CAR_DATA:
+            logger.warning(f"Make not found: {make}")
+            return []
+        if model not in CAR_DATA[make]:
+            logger.warning(f"Model not found: {model} for {make}")
+            return []
+        trims = sorted(CAR_DATA[make][model])
+        logger.info(f"Returned {len(trims)} trims for {make} {model}")
+        return trims
     except Exception as e:
-        logger.error(f"Error in get_trims: {e}")
-        return {"error": str(e)}
+        logger.error(f"Error in get_trims: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error fetching trims")
 
+# Decode VIN
 @app.get("/api/cars/decode-vin")
-def decode_vin(vin: str):
+async def decode_vin(vin: str) -> dict:
     """Decode VIN using NHTSA API"""
     try:
-        if not vin or len(vin) < 17:
-            return {"error": "Invalid VIN. Must be 17 characters."}
+        if not vin:
+            return {"error": "VIN is required"}
+        
+        vin = vin.strip().upper()
+        
+        if len(vin) < 17:
+            return {"error": "Invalid VIN. Must be at least 17 characters."}
         
         # Call NHTSA VIN Decoder API
-        response = requests.get(
-            f"https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVin/{vin}?format=json",
-            timeout=10
-        )
+        url = f"https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVin/{vin}?format=json"
+        logger.info(f"Decoding VIN: {vin}")
+        
+        response = requests.get(url, timeout=10)
         
         if response.status_code != 200:
-            logger.error(f"NHTSA API returned status {response.status_code}")
+            logger.error(f"NHTSA API error: {response.status_code}")
             return {"error": "Failed to decode VIN"}
         
         data = response.json()
@@ -146,39 +173,56 @@ def decode_vin(vin: str):
             variable = result.get("Variable", "")
             value = result.get("Value", "")
             
-            if variable == "Model Year" and value:
+            if not value:
+                continue
+                
+            if variable == "Model Year":
                 decoded["year"] = value
-            elif variable == "Make" and value:
+            elif variable == "Make":
                 decoded["make"] = value
-            elif variable == "Model" and value:
+            elif variable == "Model":
                 decoded["model"] = value
-            elif variable == "Engine Displacements" and value:
+            elif variable == "Engine Displacements":
                 decoded["engine"] = value
-            elif variable == "Transmission Type" and value:
-                decoded["transmission"] = value.replace("Automatic", "automatic").replace("Manual", "manual")
-            elif variable == "Fuel Type - Primary" and value:
+            elif variable == "Transmission Type":
+                trans = value.lower()
+                if "automatic" in trans:
+                    decoded["transmission"] = "automatic"
+                elif "manual" in trans:
+                    decoded["transmission"] = "manual"
+                elif "cvt" in trans:
+                    decoded["transmission"] = "cvt"
+            elif variable == "Fuel Type - Primary":
                 fuel = value.lower()
                 if "gasoline" in fuel:
                     decoded["fuelType"] = "gasoline"
                 elif "diesel" in fuel:
                     decoded["fuelType"] = "diesel"
-                elif "hybrid" in fuel:
+                elif "hybrid" in fuel or "electric" in fuel:
                     decoded["fuelType"] = "hybrid"
                 elif "electric" in fuel:
                     decoded["fuelType"] = "electric"
         
+        logger.info(f"VIN decoded successfully: {decoded}")
         return decoded
         
     except requests.exceptions.Timeout:
         logger.error("VIN decode timeout")
         return {"error": "VIN decode service timeout"}
-    except requests.exceptions.ConnectionError as e:
-        logger.error(f"VIN decode connection error: {e}")
+    except requests.exceptions.ConnectionError:
+        logger.error("VIN decode connection error")
         return {"error": "Failed to connect to VIN decoder service"}
     except Exception as e:
-        logger.error(f"VIN decode error: {e}")
-        return {"error": "Failed to decode VIN"}
+        logger.error(f"VIN decode error: {str(e)}")
+        return {"error": f"Failed to decode VIN: {str(e)}"}
 
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+# Startup event
+@app.on_event("startup")
+async def startup_event():
+    logger.info("Application startup")
+    logger.info(f"Loaded {len(CAR_DATA)} makes and {sum(len(v) for v in CAR_DATA.values())} models")
+
+# Shutdown event
+@app.on_event("shutdown")
+async def shutdown_event():
+    logger.info("Application shutdown")
