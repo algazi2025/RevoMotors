@@ -6,6 +6,7 @@ export default function ListCar() {
     make: '',
     model: '',
     trim: '',
+    engine: '',
     mileage: '',
     condition: 'good',
     vin: '',
@@ -25,10 +26,13 @@ export default function ListCar() {
 
   const [photos, setPhotos] = useState<File[]>([]);
   const [loading, setLoading] = useState(false);
+  const [decodingVin, setDecodingVin] = useState(false);
   
   // Autocomplete state
   const [makes, setMakes] = useState<string[]>([]);
   const [models, setModels] = useState<string[]>([]);
+  const [trims, setTrims] = useState<string[]>([]);
+  
   const [filteredMakes, setFilteredMakes] = useState<string[]>([]);
   const [filteredModels, setFilteredModels] = useState<string[]>([]);
   const [showMakeDropdown, setShowMakeDropdown] = useState(false);
@@ -37,11 +41,13 @@ export default function ListCar() {
   const makeRef = useRef<HTMLDivElement>(null);
   const modelRef = useRef<HTMLDivElement>(null);
 
+  const API_URL = 'https://revomotors.onrender.com';
+
   // Fetch makes on mount
   useEffect(() => {
     const fetchMakes = async () => {
       try {
-        const response = await fetch('https://revomotors.onrender.com/api/cars/makes');
+        const response = await fetch(`${API_URL}/api/cars/makes`);
         if (!response.ok) throw new Error('Failed to fetch makes');
         const data = await response.json();
         setMakes(data);
@@ -53,12 +59,65 @@ export default function ListCar() {
     fetchMakes();
   }, []);
 
+  // Decode VIN
+  const handleVinChange = async (value: string) => {
+    setFormData({...formData, vin: value.toUpperCase()});
+    
+    if (value.length === 17) {
+      setDecodingVin(true);
+      try {
+        const response = await fetch(`${API_URL}/api/cars/decode-vin?vin=${value}`);
+        const data = await response.json();
+        
+        if (data.error) {
+          console.error('VIN decode error:', data.error);
+          setDecodingVin(false);
+          return;
+        }
+        
+        // Auto-fill form with decoded data
+        const decodedYear = data.year || '';
+        const decodedMake = data.make || '';
+        const decodedModel = data.model || '';
+        const decodedTransmission = data.transmission || formData.transmission;
+        const decodedFuelType = data.fuelType || formData.fuelType;
+        
+        setFormData(prev => ({
+          ...prev,
+          year: decodedYear,
+          make: decodedMake,
+          model: decodedModel,
+          transmission: decodedTransmission,
+          fuelType: decodedFuelType,
+        }));
+        
+        // If we have make and model, fetch their trims
+        if (decodedMake && decodedModel) {
+          try {
+            const trimsRes = await fetch(`${API_URL}/api/cars/trims?make=${decodedMake}&model=${decodedModel}`);
+            if (trimsRes.ok) {
+              const trimsData = await trimsRes.json();
+              setTrims(trimsData);
+            }
+          } catch (error) {
+            console.error('Error fetching trims:', error);
+          }
+        }
+        
+        setDecodingVin(false);
+      } catch (error) {
+        console.error('Error decoding VIN:', error);
+        setDecodingVin(false);
+      }
+    }
+  };
+
   // Fetch models when make changes
   useEffect(() => {
     if (formData.make) {
       const fetchModels = async () => {
         try {
-          const response = await fetch(`https://revomotors.onrender.com/api/cars/models?make=${formData.make}`);
+          const response = await fetch(`${API_URL}/api/cars/models?make=${formData.make}`);
           if (!response.ok) throw new Error('Failed to fetch models');
           const data = await response.json();
           setModels(data);
@@ -71,12 +130,31 @@ export default function ListCar() {
     } else {
       setModels([]);
       setFilteredModels([]);
+      setTrims([]);
     }
   }, [formData.make]);
 
-  // Handle make input
+  // Fetch trims when model changes
+  useEffect(() => {
+    if (formData.make && formData.model) {
+      const fetchTrims = async () => {
+        try {
+          const trimsRes = await fetch(`${API_URL}/api/cars/trims?make=${formData.make}&model=${formData.model}`);
+          if (trimsRes.ok) {
+            const trimsData = await trimsRes.json();
+            setTrims(trimsData);
+          }
+        } catch (error) {
+          console.error('Error fetching trims:', error);
+        }
+      };
+      fetchTrims();
+    }
+  }, [formData.make, formData.model]);
+
+  // Handle make input with filtering
   const handleMakeInput = (value: string) => {
-    setFormData({...formData, make: value, model: ''});
+    setFormData({...formData, make: value, model: '', trim: ''});
     
     if (value.length > 0) {
       const filtered = makes.filter(m => m.toLowerCase().includes(value.toLowerCase()));
@@ -88,9 +166,9 @@ export default function ListCar() {
     }
   };
 
-  // Handle model input
+  // Handle model input with filtering
   const handleModelInput = (value: string) => {
-    setFormData({...formData, model: value});
+    setFormData({...formData, model: value, trim: ''});
     
     if (value.length > 0 && formData.make) {
       const filtered = models.filter(m => m.toLowerCase().includes(value.toLowerCase()));
@@ -163,7 +241,7 @@ export default function ListCar() {
         photos: photoUrls,
       };
 
-      const response = await fetch('https://revomotors.onrender.com/api/leads/webhook/lead_received', {
+      const response = await fetch(`${API_URL}/api/leads/webhook/lead_received`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -187,7 +265,7 @@ export default function ListCar() {
           vin: '', color: '', transmission: 'automatic', fuelType: 'gasoline',
           title: 'clean', accidents: 'none', owners: '1',
           sellerName: '', email: '', phone: '', zipCode: '',
-          description: '', askingPrice: '',
+          description: '', askingPrice: '', engine: '',
         });
         setPhotos([]);
       } else {
@@ -259,7 +337,7 @@ export default function ListCar() {
           List Your Car
         </h1>
         <p style={{ color: '#6b7280', marginBottom: '30px' }}>
-          Fill out all the details below to get accurate AI-powered offers from verified dealers
+          Enter VIN to auto-fill, or manually select make, model, and trim
         </p>
 
         <form onSubmit={handleSubmit} style={{ backgroundColor: 'white', padding: '40px', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
@@ -271,6 +349,22 @@ export default function ListCar() {
             </h2>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px' }}>
+              {/* VIN Decoder */}
+              <div>
+                <label style={labelStyle}>VIN Number {decodingVin && <span style={{fontSize: '12px', color: '#3b82f6'}}>Decoding...</span>}</label>
+                <input
+                  type="text"
+                  minLength={17}
+                  maxLength={17}
+                  value={formData.vin}
+                  onChange={(e) => handleVinChange(e.target.value.toUpperCase())}
+                  style={{...inputStyle, textTransform: 'uppercase'}}
+                  placeholder="Enter 17-digit VIN to auto-fill form"
+                />
+                {formData.vin.length === 17 && !decodingVin && <span style={{fontSize: '12px', color: '#059669'}}>✓ Decoded</span>}
+              </div>
+
+              {/* Year */}
               <div>
                 <label style={labelStyle}>Year *</label>
                 <input
@@ -285,7 +379,7 @@ export default function ListCar() {
                 />
               </div>
 
-              {/* Make Dropdown */}
+              {/* Make Dropdown with Filter */}
               <div style={{ position: 'relative' }} ref={makeRef}>
                 <label style={labelStyle}>Make *</label>
                 <input
@@ -300,7 +394,7 @@ export default function ListCar() {
                     }
                   }}
                   style={inputStyle}
-                  placeholder="Click to select or type..."
+                  placeholder="Type make (e.g., Toyota, Honda)"
                 />
                 {showMakeDropdown && filteredMakes.length > 0 && (
                   <div style={dropdownStyle}>
@@ -308,7 +402,7 @@ export default function ListCar() {
                       <div
                         key={make}
                         onClick={() => {
-                          setFormData({...formData, make, model: ''});
+                          setFormData({...formData, make, model: '', trim: ''});
                           setShowMakeDropdown(false);
                         }}
                         onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f3f4f6')}
@@ -322,7 +416,7 @@ export default function ListCar() {
                 )}
               </div>
 
-              {/* Model Dropdown */}
+              {/* Model Dropdown with Filter */}
               <div style={{ position: 'relative' }} ref={modelRef}>
                 <label style={labelStyle}>Model *</label>
                 <input
@@ -344,7 +438,7 @@ export default function ListCar() {
                     backgroundColor: !formData.make ? '#f3f4f6' : 'white',
                     cursor: !formData.make ? 'not-allowed' : 'text',
                   }}
-                  placeholder={formData.make ? 'Click to select or type...' : 'Select make first'}
+                  placeholder={formData.make ? 'Type model' : 'Select make first'}
                 />
                 {showModelDropdown && formData.make && filteredModels.length > 0 && (
                   <div style={dropdownStyle}>
@@ -352,7 +446,7 @@ export default function ListCar() {
                       <div
                         key={model}
                         onClick={() => {
-                          setFormData({...formData, model});
+                          setFormData({...formData, model, trim: ''});
                           setShowModelDropdown(false);
                         }}
                         onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f3f4f6')}
@@ -366,15 +460,20 @@ export default function ListCar() {
                 )}
               </div>
 
+              {/* Trim Dropdown */}
               <div>
                 <label style={labelStyle}>Trim</label>
-                <input
-                  type="text"
+                <select
                   value={formData.trim}
                   onChange={(e) => setFormData({...formData, trim: e.target.value})}
-                  style={inputStyle}
-                  placeholder="EX, LX, Sport"
-                />
+                  style={{...inputStyle, backgroundColor: !formData.model ? '#f3f4f6' : 'white'}}
+                  disabled={!formData.model}
+                >
+                  <option value="">Select trim</option>
+                  {trims.map(trim => (
+                    <option key={trim} value={trim}>{trim}</option>
+                  ))}
+                </select>
               </div>
 
               <div>
@@ -386,20 +485,6 @@ export default function ListCar() {
                   onChange={(e) => setFormData({...formData, mileage: e.target.value})}
                   style={inputStyle}
                   placeholder="45000"
-                />
-              </div>
-
-              <div>
-                <label style={labelStyle}>VIN Number *</label>
-                <input
-                  type="text"
-                  required
-                  minLength={17}
-                  maxLength={17}
-                  value={formData.vin}
-                  onChange={(e) => setFormData({...formData, vin: e.target.value.toUpperCase()})}
-                  style={inputStyle}
-                  placeholder="1HGBH41JXMN109186"
                 />
               </div>
 
