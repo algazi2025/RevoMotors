@@ -2,699 +2,178 @@ import React, { useState, useEffect, useRef } from 'react';
 
 export default function ListCar() {
   const [formData, setFormData] = useState({
-    year: '',
-    make: '',
-    model: '',
-    trim: '',
-    engine: '',
-    mileage: '',
-    condition: 'good',
-    vin: '',
-    color: '',
-    transmission: 'automatic',
-    fuelType: 'gasoline',
-    title: 'clean',
-    accidents: 'none',
-    owners: '1',
-    sellerName: '',
-    email: '',
-    phone: '',
-    zipCode: '',
-    description: '',
-    askingPrice: '',
+    year: '', make: '', model: '', trim: '', mileage: '', condition: 'good',
+    vin: '', color: '', transmission: 'automatic', fuelType: 'gasoline',
+    titleStatus: 'clean', accidentHistory: 'none', numOwners: '1',
+    sellerName: '', email: '', phone: '', zipCode: '', description: '', askingPrice: '',
   });
 
-  const [photos, setPhotos] = useState<File[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [decodingVin, setDecodingVin] = useState(false);
-  
-  // Autocomplete state
+  const [trims, setTrims] = useState<string[]>([]);
+  const [colors, setColors] = useState<string[]>([]);
   const [makes, setMakes] = useState<string[]>([]);
   const [models, setModels] = useState<string[]>([]);
-  const [trims, setTrims] = useState<string[]>([]);
-  
   const [filteredMakes, setFilteredMakes] = useState<string[]>([]);
   const [filteredModels, setFilteredModels] = useState<string[]>([]);
   const [showMakeDropdown, setShowMakeDropdown] = useState(false);
   const [showModelDropdown, setShowModelDropdown] = useState(false);
-  
-  const makeRef = useRef<HTMLDivElement>(null);
-  const modelRef = useRef<HTMLDivElement>(null);
+  const [loading, setLoading] = useState(false);
 
   const API_URL = 'https://revomotors.onrender.com';
 
-  // Fetch makes on mount
   useEffect(() => {
-    const fetchMakes = async () => {
-      try {
-        const response = await fetch(`${API_URL}/api/cars/makes`);
-        if (!response.ok) throw new Error('Failed to fetch makes');
-        const data = await response.json();
-        setMakes(data);
-        setFilteredMakes(data);
-      } catch (error) {
-        console.error('Error fetching makes:', error);
-      }
-    };
-    fetchMakes();
+    fetch(`${API_URL}/api/cars/makes`).then(r => r.json()).then(setMakes).then(() => setFilteredMakes);
+    fetch(`${API_URL}/api/cars/colors`).then(r => r.json()).then(setColors);
   }, []);
 
-  // Decode VIN
-  const handleVinChange = async (value: string) => {
-    setFormData({...formData, vin: value.toUpperCase()});
-    
-    if (value.length === 17) {
-      setDecodingVin(true);
-      try {
-        const response = await fetch(`${API_URL}/api/cars/decode-vin?vin=${value}`);
-        const data = await response.json();
-        
-        if (data.error) {
-          console.error('VIN decode error:', data.error);
-          setDecodingVin(false);
-          return;
-        }
-        
-        // Auto-fill form with decoded data
-        const decodedYear = data.year || '';
-        const decodedMake = data.make || '';
-        const decodedModel = data.model || '';
-        const decodedTransmission = data.transmission || formData.transmission;
-        const decodedFuelType = data.fuelType || formData.fuelType;
-        
-        setFormData(prev => ({
-          ...prev,
-          year: decodedYear,
-          make: decodedMake,
-          model: decodedModel,
-          transmission: decodedTransmission,
-          fuelType: decodedFuelType,
-        }));
-        
-        // If we have make and model, fetch their trims
-        if (decodedMake && decodedModel) {
-          try {
-            const trimsRes = await fetch(`${API_URL}/api/cars/trims?make=${decodedMake}&model=${decodedModel}`);
-            if (trimsRes.ok) {
-              const trimsData = await trimsRes.json();
-              setTrims(trimsData);
-            }
-          } catch (error) {
-            console.error('Error fetching trims:', error);
-          }
-        }
-        
-        setDecodingVin(false);
-      } catch (error) {
-        console.error('Error decoding VIN:', error);
-        setDecodingVin(false);
-      }
-    }
-  };
-
-  // Fetch models when make changes
   useEffect(() => {
     if (formData.make) {
-      const fetchModels = async () => {
-        try {
-          const response = await fetch(`${API_URL}/api/cars/models?make=${formData.make}`);
-          if (!response.ok) throw new Error('Failed to fetch models');
-          const data = await response.json();
-          setModels(data);
-          setFilteredModels(data);
-        } catch (error) {
-          console.error('Error fetching models:', error);
-        }
-      };
-      fetchModels();
-    } else {
-      setModels([]);
-      setFilteredModels([]);
-      setTrims([]);
+      fetch(`${API_URL}/api/cars/models?make=${formData.make}`).then(r => r.json()).then(data => {
+        setModels(data);
+        setFilteredModels(data);
+      });
     }
   }, [formData.make]);
 
-  // Fetch trims when model changes
   useEffect(() => {
     if (formData.make && formData.model) {
-      const fetchTrims = async () => {
-        try {
-          const trimsRes = await fetch(`${API_URL}/api/cars/trims?make=${formData.make}&model=${formData.model}`);
-          if (trimsRes.ok) {
-            const trimsData = await trimsRes.json();
-            setTrims(trimsData);
-          }
-        } catch (error) {
-          console.error('Error fetching trims:', error);
-        }
-      };
-      fetchTrims();
+      fetch(`${API_URL}/api/cars/trims?make=${formData.make}&model=${formData.model}`).then(r => r.json()).then(setTrims);
     }
   }, [formData.make, formData.model]);
 
-  // Handle make input with filtering
-  const handleMakeInput = (value: string) => {
-    setFormData({...formData, make: value, model: '', trim: ''});
-    
-    if (value.length > 0) {
-      const filtered = makes.filter(m => m.toLowerCase().includes(value.toLowerCase()));
-      setFilteredMakes(filtered);
-      setShowMakeDropdown(true);
-    } else {
-      setFilteredMakes(makes);
-      setShowMakeDropdown(false);
-    }
-  };
-
-  // Handle model input with filtering
-  const handleModelInput = (value: string) => {
-    setFormData({...formData, model: value, trim: ''});
-    
-    if (value.length > 0 && formData.make) {
-      const filtered = models.filter(m => m.toLowerCase().includes(value.toLowerCase()));
-      setFilteredModels(filtered);
-      setShowModelDropdown(true);
-    } else {
-      setFilteredModels(models);
-      setShowModelDropdown(false);
-    }
-  };
-
-  // Click outside to close dropdowns
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (makeRef.current && !makeRef.current.contains(event.target as Node)) {
-        setShowMakeDropdown(false);
+  const handleVINDecode = async (vin: string) => {
+    if (vin.length === 17) {
+      const data = await fetch(`${API_URL}/api/cars/decode-vin?vin=${vin}`).then(r => r.json());
+      if (data.year && data.make && data.model) {
+        setFormData(prev => ({...prev, year: data.year, make: data.make, model: data.model, fuelType: data.fuelType || 'gasoline'}));
       }
-      if (modelRef.current && !modelRef.current.contains(event.target as Node)) {
-        setShowModelDropdown(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      setPhotos(Array.from(e.target.files));
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-
     try {
-      const photoUrls: string[] = [];
-      for (const photo of photos) {
-        const reader = new FileReader();
-        const base64 = await new Promise<string>((resolve) => {
-          reader.onloadend = () => resolve(reader.result as string);
-          reader.readAsDataURL(photo);
-        });
-        photoUrls.push(base64);
-      }
-
-      const payload = {
-        marketplace: 'direct',
-        title: `${formData.year} ${formData.make} ${formData.model} ${formData.trim}`.trim(),
-        year: parseInt(formData.year),
-        make: formData.make,
-        model: formData.model,
-        trim: formData.trim,
-        mileage: parseInt(formData.mileage),
-        condition: formData.condition,
-        vin: formData.vin,
-        color: formData.color,
-        transmission: formData.transmission,
-        fuel_type: formData.fuelType,
-        title_status: formData.title,
-        accident_history: formData.accidents,
-        number_of_owners: parseInt(formData.owners),
-        asking_price: formData.askingPrice ? parseFloat(formData.askingPrice) : null,
-        description: formData.description,
-        region: formData.zipCode,
-        seller_contact_name: formData.sellerName,
-        seller_contact_email: formData.email,
-        seller_contact_phone: formData.phone,
-        photos: photoUrls,
-      };
-
-      const response = await fetch(`${API_URL}/api/leads/webhook/lead_received`, {
+      const res = await fetch(`${API_URL}/api/leads/webhook/lead_received`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({vin: formData.vin, year: formData.year, make: formData.make, model: formData.model, trim: formData.trim, mileage: parseInt(formData.mileage), color: formData.color, transmission: formData.transmission, fuelType: formData.fuelType, titleStatus: formData.titleStatus, accidentHistory: formData.accidentHistory, numOwners: parseInt(formData.numOwners), askingPrice: parseInt(formData.askingPrice), description: formData.description}),
       });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        alert(
-          `✅ Success! Your car has been listed.\n\n` +
-          `Listing ID: ${data.listing_id}\n` +
-          `AI Fair Offer: $${data.ai_draft_offer?.fair || 'N/A'}\n` +
-          `Price Range: $${data.ai_draft_offer?.low || 'N/A'} - $${data.ai_draft_offer?.max || 'N/A'}\n\n` +
-          `Dealers will contact you soon!`
-        );
-        
-        setFormData({
-          year: '', make: '', model: '', trim: '', mileage: '', condition: 'good',
-          vin: '', color: '', transmission: 'automatic', fuelType: 'gasoline',
-          title: 'clean', accidents: 'none', owners: '1',
-          sellerName: '', email: '', phone: '', zipCode: '',
-          description: '', askingPrice: '', engine: '',
-        });
-        setPhotos([]);
-      } else {
-        alert(`Error: ${data.detail || 'Failed to submit listing'}`);
+      if (res.ok) {
+        alert('Success! Listing submitted.');
+        setFormData({year: '', make: '', model: '', trim: '', mileage: '', condition: 'good', vin: '', color: '', transmission: 'automatic', fuelType: 'gasoline', titleStatus: 'clean', accidentHistory: 'none', numOwners: '1', sellerName: '', email: '', phone: '', zipCode: '', description: '', askingPrice: ''});
       }
     } catch (error) {
-      console.error('Error:', error);
-      alert('Error connecting to server. Please check your connection and try again.');
+      alert('Error submitting. Try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  const inputStyle = {
-    width: '100%',
-    padding: '12px',
-    border: '1px solid #d1d5db',
-    borderRadius: '6px',
-    fontSize: '16px',
-  };
-
-  const labelStyle = {
-    display: 'block' as const,
-    fontWeight: '500' as const,
-    marginBottom: '8px',
-    fontSize: '14px',
-  };
-
-  const sectionStyle = {
-    marginBottom: '30px',
-    paddingBottom: '20px',
-    borderBottom: '1px solid #e5e7eb',
-  };
-
-  const dropdownStyle = {
-    position: 'absolute' as const,
-    top: '100%',
-    left: 0,
-    right: 0,
-    backgroundColor: 'white',
-    border: '1px solid #d1d5db',
-    borderRadius: '6px',
-    maxHeight: '250px',
-    overflowY: 'auto' as const,
-    zIndex: 10,
-    marginTop: '4px',
-    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-  };
-
-  const optionStyle = {
-    padding: '10px 12px',
-    cursor: 'pointer',
-    borderBottom: '1px solid #f3f4f6',
-    transition: 'background-color 0.2s',
-  };
+  const labelStyle = {display: 'block', marginTop: '16px', marginBottom: '8px', fontWeight: '600'};
+  const inputStyle = {width: '100%', padding: '12px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '14px'};
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#f9fafb', fontFamily: 'system-ui' }}>
-      <div style={{ backgroundColor: 'white', borderBottom: '1px solid #e5e7eb', padding: '20px' }}>
-        <div style={{ maxWidth: '900px', margin: '0 auto' }}>
-          <a href="/" style={{ color: '#2563eb', textDecoration: 'none', fontSize: '14px' }}>
-            ← Back to Home
-          </a>
+    <div style={{maxWidth: '900px', margin: '0 auto', padding: '24px'}}>
+      <h1 style={{fontSize: '32px', fontWeight: 'bold', marginBottom: '32px'}}>🚗 Vehicle Information</h1>
+      <form onSubmit={handleSubmit}>
+        <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px'}}>
+          <div>
+            <label style={labelStyle}>VIN</label>
+            <input type="text" placeholder="KNDMC5C16J6368353" value={formData.vin} onChange={(e) => {setFormData({...formData, vin: e.target.value}); handleVINDecode(e.target.value);}} style={inputStyle} />
+          </div>
+          <div>
+            <label style={labelStyle}>Year</label>
+            <input type="text" placeholder="2018" value={formData.year} onChange={(e) => setFormData({...formData, year: e.target.value})} style={inputStyle} />
+          </div>
         </div>
-      </div>
 
-      <div style={{ maxWidth: '900px', margin: '0 auto', padding: '40px 20px' }}>
-        <h1 style={{ fontSize: '32px', fontWeight: 'bold', marginBottom: '10px' }}>
-          List Your Car
-        </h1>
-        <p style={{ color: '#6b7280', marginBottom: '30px' }}>
-          Enter VIN to auto-fill, or manually select make, model, and trim
-        </p>
-
-        <form onSubmit={handleSubmit} style={{ backgroundColor: 'white', padding: '40px', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
-          
-          {/* Vehicle Information */}
-          <div style={sectionStyle}>
-            <h2 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '20px' }}>
-              🚗 Vehicle Information
-            </h2>
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px' }}>
-              {/* VIN Decoder */}
-              <div>
-                <label style={labelStyle}>VIN Number {decodingVin && <span style={{fontSize: '12px', color: '#3b82f6'}}>Decoding...</span>}</label>
-                <input
-                  type="text"
-                  minLength={17}
-                  maxLength={17}
-                  value={formData.vin}
-                  onChange={(e) => handleVinChange(e.target.value.toUpperCase())}
-                  style={{...inputStyle, textTransform: 'uppercase'}}
-                  placeholder="Enter 17-digit VIN to auto-fill form"
-                />
-                {formData.vin.length === 17 && !decodingVin && <span style={{fontSize: '12px', color: '#059669'}}>✓ Decoded</span>}
-              </div>
-
-              {/* Year */}
-              <div>
-                <label style={labelStyle}>Year *</label>
-                <input
-                  type="number"
-                  required
-                  min="1990"
-                  max="2025"
-                  value={formData.year}
-                  onChange={(e) => setFormData({...formData, year: e.target.value})}
-                  style={inputStyle}
-                  placeholder="2020"
-                />
-              </div>
-
-              {/* Make Dropdown with Filter */}
-              <div style={{ position: 'relative' }} ref={makeRef}>
-                <label style={labelStyle}>Make *</label>
-                <input
-                  type="text"
-                  required
-                  value={formData.make}
-                  onChange={(e) => handleMakeInput(e.target.value)}
-                  onFocus={() => {
-                    setShowMakeDropdown(true);
-                    if (formData.make === '') {
-                      setFilteredMakes(makes);
-                    }
-                  }}
-                  style={inputStyle}
-                  placeholder="Type make (e.g., Toyota, Honda)"
-                />
-                {showMakeDropdown && filteredMakes.length > 0 && (
-                  <div style={dropdownStyle}>
-                    {filteredMakes.map((make) => (
-                      <div
-                        key={make}
-                        onClick={() => {
-                          setFormData({...formData, make, model: '', trim: ''});
-                          setShowMakeDropdown(false);
-                        }}
-                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f3f4f6')}
-                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'white')}
-                        style={optionStyle}
-                      >
-                        {make}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Model Dropdown with Filter */}
-              <div style={{ position: 'relative' }} ref={modelRef}>
-                <label style={labelStyle}>Model *</label>
-                <input
-                  type="text"
-                  required
-                  disabled={!formData.make}
-                  value={formData.model}
-                  onChange={(e) => handleModelInput(e.target.value)}
-                  onFocus={() => {
-                    if (formData.make) {
-                      setShowModelDropdown(true);
-                      if (formData.model === '') {
-                        setFilteredModels(models);
-                      }
-                    }
-                  }}
-                  style={{
-                    ...inputStyle,
-                    backgroundColor: !formData.make ? '#f3f4f6' : 'white',
-                    cursor: !formData.make ? 'not-allowed' : 'text',
-                  }}
-                  placeholder={formData.make ? 'Type model' : 'Select make first'}
-                />
-                {showModelDropdown && formData.make && filteredModels.length > 0 && (
-                  <div style={dropdownStyle}>
-                    {filteredModels.map((model) => (
-                      <div
-                        key={model}
-                        onClick={() => {
-                          setFormData({...formData, model, trim: ''});
-                          setShowModelDropdown(false);
-                        }}
-                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f3f4f6')}
-                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'white')}
-                        style={optionStyle}
-                      >
-                        {model}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Trim Dropdown */}
-              <div>
-                <label style={labelStyle}>Trim</label>
-                <select
-                  value={formData.trim}
-                  onChange={(e) => setFormData({...formData, trim: e.target.value})}
-                  style={{...inputStyle, backgroundColor: !formData.model ? '#f3f4f6' : 'white'}}
-                  disabled={!formData.model}
-                >
-                  <option value="">Select trim</option>
-                  {trims.map(trim => (
-                    <option key={trim} value={trim}>{trim}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label style={labelStyle}>Mileage *</label>
-                <input
-                  type="number"
-                  required
-                  value={formData.mileage}
-                  onChange={(e) => setFormData({...formData, mileage: e.target.value})}
-                  style={inputStyle}
-                  placeholder="45000"
-                />
-              </div>
-
-              <div>
-                <label style={labelStyle}>Color</label>
-                <input
-                  type="text"
-                  value={formData.color}
-                  onChange={(e) => setFormData({...formData, color: e.target.value})}
-                  style={inputStyle}
-                  placeholder="Black, White, Silver"
-                />
-              </div>
-
-              <div>
-                <label style={labelStyle}>Condition</label>
-                <select
-                  value={formData.condition}
-                  onChange={(e) => setFormData({...formData, condition: e.target.value})}
-                  style={inputStyle}
-                >
-                  <option>excellent</option>
-                  <option>good</option>
-                  <option>fair</option>
-                  <option>poor</option>
-                </select>
-              </div>
-
-              <div>
-                <label style={labelStyle}>Transmission</label>
-                <select
-                  value={formData.transmission}
-                  onChange={(e) => setFormData({...formData, transmission: e.target.value})}
-                  style={inputStyle}
-                >
-                  <option>automatic</option>
-                  <option>manual</option>
-                  <option>cvt</option>
-                </select>
-              </div>
-
-              <div>
-                <label style={labelStyle}>Fuel Type</label>
-                <select
-                  value={formData.fuelType}
-                  onChange={(e) => setFormData({...formData, fuelType: e.target.value})}
-                  style={inputStyle}
-                >
-                  <option>gasoline</option>
-                  <option>diesel</option>
-                  <option>hybrid</option>
-                  <option>electric</option>
-                </select>
-              </div>
-
-              <div>
-                <label style={labelStyle}>Title Status</label>
-                <select
-                  value={formData.title}
-                  onChange={(e) => setFormData({...formData, title: e.target.value})}
-                  style={inputStyle}
-                >
-                  <option>clean</option>
-                  <option>salvage</option>
-                  <option>rebuilt</option>
-                </select>
-              </div>
-
-              <div>
-                <label style={labelStyle}>Accident History</label>
-                <select
-                  value={formData.accidents}
-                  onChange={(e) => setFormData({...formData, accidents: e.target.value})}
-                  style={inputStyle}
-                >
-                  <option>none</option>
-                  <option>minor</option>
-                  <option>major</option>
-                </select>
-              </div>
-
-              <div>
-                <label style={labelStyle}>Number of Owners</label>
-                <select
-                  value={formData.owners}
-                  onChange={(e) => setFormData({...formData, owners: e.target.value})}
-                  style={inputStyle}
-                >
-                  <option>1</option>
-                  <option>2</option>
-                  <option>3+</option>
-                </select>
-              </div>
-
-              <div>
-                <label style={labelStyle}>Asking Price ($)</label>
-                <input
-                  type="number"
-                  value={formData.askingPrice}
-                  onChange={(e) => setFormData({...formData, askingPrice: e.target.value})}
-                  style={inputStyle}
-                  placeholder="25000"
-                />
-              </div>
-            </div>
-
-            <div style={{ marginTop: '20px' }}>
-              <label style={labelStyle}>Description</label>
-              <textarea
-                value={formData.description}
-                onChange={(e) => setFormData({...formData, description: e.target.value})}
-                style={{...inputStyle, minHeight: '100px', fontFamily: 'system-ui'}}
-                placeholder="Describe the condition, features, maintenance history..."
-              />
-            </div>
-
-            <div style={{ marginTop: '20px' }}>
-              <label style={labelStyle}>Photos</label>
-              <input
-                type="file"
-                multiple
-                accept="image/*"
-                onChange={handleFileChange}
-                style={{...inputStyle, padding: '8px'}}
-              />
-              {photos.length > 0 && (
-                <p style={{ color: '#059669', marginTop: '8px' }}>
-                  ✓ {photos.length} photo(s) selected
-                </p>
-              )}
-            </div>
+        <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '20px', marginBottom: '20px'}}>
+          <div>
+            <label style={labelStyle}>Make</label>
+            <input type="text" placeholder="Toyota" value={formData.make} onChange={(e) => {setFormData({...formData, make: e.target.value, model: '', trim: ''}); const filtered = makes.filter(m => m.toLowerCase().includes(e.target.value.toLowerCase())); setFilteredMakes(filtered); setShowMakeDropdown(true);}} style={inputStyle} autoComplete="off" />
+            {showMakeDropdown && filteredMakes.length > 0 && <div style={{position: 'absolute', border: '1px solid #ddd', backgroundColor: '#fff', maxHeight: '200px', overflowY: 'auto', width: 'calc(33.33% - 14px)', zIndex: 10}}>
+              {filteredMakes.map((make) => <div key={make} onClick={() => {setFormData({...formData, make, model: '', trim: ''}); setShowMakeDropdown(false);}} style={{padding: '10px', cursor: 'pointer', borderBottom: '1px solid #eee'}}>{make}</div>)}
+            </div>}
           </div>
-
-          {/* Seller Information */}
-          <div style={sectionStyle}>
-            <h2 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '20px' }}>
-              👤 Seller Information
-            </h2>
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px' }}>
-              <div>
-                <label style={labelStyle}>Full Name *</label>
-                <input
-                  type="text"
-                  required
-                  value={formData.sellerName}
-                  onChange={(e) => setFormData({...formData, sellerName: e.target.value})}
-                  style={inputStyle}
-                  placeholder="John Doe"
-                />
-              </div>
-
-              <div>
-                <label style={labelStyle}>Email *</label>
-                <input
-                  type="email"
-                  required
-                  value={formData.email}
-                  onChange={(e) => setFormData({...formData, email: e.target.value})}
-                  style={inputStyle}
-                  placeholder="john@example.com"
-                />
-              </div>
-
-              <div>
-                <label style={labelStyle}>Phone *</label>
-                <input
-                  type="tel"
-                  required
-                  value={formData.phone}
-                  onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                  style={inputStyle}
-                  placeholder="(555) 123-4567"
-                />
-              </div>
-
-              <div>
-                <label style={labelStyle}>Zip Code *</label>
-                <input
-                  type="text"
-                  required
-                  value={formData.zipCode}
-                  onChange={(e) => setFormData({...formData, zipCode: e.target.value})}
-                  style={inputStyle}
-                  placeholder="95814"
-                />
-              </div>
-            </div>
+          <div>
+            <label style={labelStyle}>Model</label>
+            <input type="text" placeholder="Camry" value={formData.model} onChange={(e) => {setFormData({...formData, model: e.target.value, trim: ''}); const filtered = models.filter(m => m.toLowerCase().includes(e.target.value.toLowerCase())); setFilteredModels(filtered); setShowModelDropdown(true);}} disabled={!formData.make} style={inputStyle} autoComplete="off" />
+            {showModelDropdown && filteredModels.length > 0 && <div style={{position: 'absolute', border: '1px solid #ddd', backgroundColor: '#fff', maxHeight: '200px', overflowY: 'auto', width: 'calc(33.33% - 14px)', zIndex: 10}}>
+              {filteredModels.map((model) => <div key={model} onClick={() => {setFormData({...formData, model, trim: ''}); setShowModelDropdown(false);}} style={{padding: '10px', cursor: 'pointer', borderBottom: '1px solid #eee'}}>{model}</div>)}
+            </div>}
           </div>
+          <div>
+            <label style={labelStyle}>Trim</label>
+            <select value={formData.trim} onChange={(e) => setFormData({...formData, trim: e.target.value})} style={{...inputStyle, cursor: 'pointer'}} disabled={!formData.model || trims.length === 0}>
+              <option value="">Select trim</option>
+              {trims.map((trim) => <option key={trim} value={trim}>{trim}</option>)}
+            </select>
+          </div>
+        </div>
 
-          {/* Submit Button */}
-          <button
-            type="submit"
-            disabled={loading}
-            style={{
-              width: '100%',
-              padding: '14px',
-              backgroundColor: loading ? '#9ca3af' : '#2563eb',
-              color: 'white',
-              border: 'none',
-              borderRadius: '6px',
-              fontSize: '16px',
-              fontWeight: '600',
-              cursor: loading ? 'not-allowed' : 'pointer',
-            }}
-          >
-            {loading ? 'Listing Your Car...' : '✓ List My Car'}
-          </button>
-        </form>
-      </div>
+        <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px'}}>
+          <div>
+            <label style={labelStyle}>Mileage</label>
+            <input type="number" placeholder="45000" value={formData.mileage} onChange={(e) => setFormData({...formData, mileage: e.target.value})} style={inputStyle} />
+          </div>
+          <div>
+            <label style={labelStyle}>Color</label>
+            <select value={formData.color} onChange={(e) => setFormData({...formData, color: e.target.value})} style={{...inputStyle, cursor: 'pointer'}}>
+              <option value="">Select color</option>
+              {colors.map((color) => <option key={color} value={color}>{color}</option>)}
+            </select>
+          </div>
+        </div>
+
+        <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px'}}>
+          <div>
+            <label style={labelStyle}>Transmission</label>
+            <select value={formData.transmission} onChange={(e) => setFormData({...formData, transmission: e.target.value})} style={{...inputStyle, cursor: 'pointer'}}>
+              <option value="automatic">Automatic</option>
+              <option value="manual">Manual</option>
+            </select>
+          </div>
+          <div>
+            <label style={labelStyle}>Fuel Type</label>
+            <select value={formData.fuelType} onChange={(e) => setFormData({...formData, fuelType: e.target.value})} style={{...inputStyle, cursor: 'pointer'}}>
+              <option value="gasoline">Gasoline</option>
+              <option value="diesel">Diesel</option>
+              <option value="hybrid">Hybrid</option>
+              <option value="electric">Electric</option>
+            </select>
+          </div>
+        </div>
+
+        <div style={{display: 'grid', gridTemplateColumns: '1fr', gap: '20px', marginBottom: '20px'}}>
+          <div>
+            <label style={labelStyle}>Title Status</label>
+            <select value={formData.titleStatus} onChange={(e) => setFormData({...formData, titleStatus: e.target.value})} style={{...inputStyle, cursor: 'pointer'}}>
+              <option value="clean">Clean</option>
+              <option value="salvage">Salvage</option>
+            </select>
+          </div>
+          <div>
+            <label style={labelStyle}>Accident History</label>
+            <select value={formData.accidentHistory} onChange={(e) => setFormData({...formData, accidentHistory: e.target.value})} style={{...inputStyle, cursor: 'pointer'}}>
+              <option value="none">None</option>
+              <option value="minor">Minor</option>
+              <option value="major">Major</option>
+            </select>
+          </div>
+          <div>
+            <label style={labelStyle}>Description</label>
+            <textarea placeholder="Describe vehicle..." value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} style={{...inputStyle, minHeight: '120px'}} />
+          </div>
+          <div>
+            <label style={labelStyle}>Asking Price</label>
+            <input type="number" placeholder="25000" value={formData.askingPrice} onChange={(e) => setFormData({...formData, askingPrice: e.target.value})} style={inputStyle} />
+          </div>
+        </div>
+
+        <button type="submit" disabled={loading} style={{width: '100%', padding: '16px', backgroundColor: '#2563eb', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer'}}>
+          {loading ? 'Submitting...' : 'List My Car'}
+        </button>
+      </form>
     </div>
   );
 }
