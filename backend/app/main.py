@@ -1,7 +1,25 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from typing import Optional
 
 app = FastAPI()
+
+class LeadData(BaseModel):
+    vin: str
+    year: Optional[str] = None
+    make: Optional[str] = None
+    model: Optional[str] = None
+    trim: Optional[str] = None
+    mileage: Optional[int] = None
+    color: Optional[str] = None
+    transmission: Optional[str] = None
+    fuelType: Optional[str] = None
+    titleStatus: Optional[str] = None
+    accidentHistory: Optional[str] = None
+    numOwners: Optional[int] = None
+    askingPrice: Optional[int] = None
+    description: Optional[str] = None
 
 app.add_middleware(
     CORSMiddleware,
@@ -462,10 +480,10 @@ def decode_vin(vin: str):
         return {"error": "VIN decode failed"}
 
 @app.post("/api/leads/webhook/lead_received")
-def lead_received(data: dict):
+def lead_received(lead: LeadData):
     """Receive lead submission"""
     try:
-        lead_id = f"LEAD_{data.get('vin', 'UNKNOWN')[:8]}"
+        lead_id = f"LEAD_{lead.vin[:8]}"
         
         return {
             "success": True,
