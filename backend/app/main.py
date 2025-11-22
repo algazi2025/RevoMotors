@@ -1128,11 +1128,17 @@ def decode_vin(vin: str):
                     }
                     
                     for r in results:
-                        var = r.get("Variable", "").strip()
-                        val = r.get("Value", "").strip()
-                        
-                        if not val:
+                        if not r or not isinstance(r, dict):
                             continue
+                        
+                        var = r.get("Variable") or ""
+                        val = r.get("Value") or ""
+                        
+                        if not var or not val:
+                            continue
+                        
+                        var = str(var).strip()
+                        val = str(val).strip()
                         
                         if var == "Model Year":
                             decoded["year"] = val
