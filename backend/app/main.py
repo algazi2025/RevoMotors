@@ -1140,6 +1140,10 @@ def decode_vin(vin: str):
                         var = str(var).strip()
                         val = str(val).strip()
                         
+                        if not val:
+                            continue
+                        
+                        # Match various possible variable names from NHTSA
                         if var == "Model Year":
                             decoded["year"] = val
                         elif var == "Make":
@@ -1150,7 +1154,7 @@ def decode_vin(vin: str):
                             decoded["bodyClass"] = val
                         elif var == "Series":
                             decoded["series"] = val
-                        elif var == "Fuel Type - Primary":
+                        elif var == "Fuel Type - Primary" or var == "Fuel Type":
                             fuel_lower = val.lower()
                             if "gasoline" in fuel_lower:
                                 decoded["fuelType"] = "Gasoline"
@@ -1170,6 +1174,9 @@ def decode_vin(vin: str):
                                 decoded["fuelType"] = "CNG"
                             else:
                                 decoded["fuelType"] = val
+                        
+                        # Log what we're finding (for debugging)
+                        logger.info(f"[VIN Decode] Found: {var} = {val}")
                     
                     # Verify we got the essential data
                     if decoded["year"] and decoded["make"] and decoded["model"]:
