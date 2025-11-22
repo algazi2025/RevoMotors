@@ -1079,16 +1079,19 @@ def get_colors():
     return COLORS
 
 @app.get("/api/cars/decode-vin")
-def decode_vin(vin: str = None):
+def decode_vin(vin: str):
     """
     Decode VIN using NHTSA API with comprehensive error handling
     """
     try:
-        # Normalize and validate VIN
-        if not vin:
+        # Normalize and validate VIN - handle None/empty
+        if not vin or not isinstance(vin, str):
             return {"error": "VIN is required"}
         
         vin = vin.strip().upper()
+        
+        if not vin:
+            return {"error": "VIN is required"}
         
         if len(vin) != 17:
             return {"error": f"Invalid VIN - must be exactly 17 characters (got {len(vin)})"}
