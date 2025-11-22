@@ -1140,20 +1140,28 @@ def decode_vin(vin: str):
                         var = str(var).strip()
                         val = str(val).strip()
                         
+                        # DEBUG: Log ALL fields
+                        logger.info(f"[VIN Decode DEBUG] {var} = {val}")
+                        
                         if not val:
                             continue
                         
                         # Match various possible variable names from NHTSA
                         if var == "Model Year":
                             decoded["year"] = val
+                            logger.info(f"[VIN Decode] SET year = {val}")
                         elif var == "Make":
                             decoded["make"] = val
+                            logger.info(f"[VIN Decode] SET make = {val}")
                         elif var == "Model":
                             decoded["model"] = val
+                            logger.info(f"[VIN Decode] SET model = {val}")
                         elif var == "Body Class":
                             decoded["bodyClass"] = val
+                            logger.info(f"[VIN Decode] SET bodyClass = {val}")
                         elif var == "Series":
                             decoded["series"] = val
+                            logger.info(f"[VIN Decode] SET series = {val}")
                         elif var == "Fuel Type - Primary" or var == "Fuel Type":
                             fuel_lower = val.lower()
                             if "gasoline" in fuel_lower:
@@ -1174,9 +1182,7 @@ def decode_vin(vin: str):
                                 decoded["fuelType"] = "CNG"
                             else:
                                 decoded["fuelType"] = val
-                        
-                        # Log what we're finding (for debugging)
-                        logger.info(f"[VIN Decode] Found: {var} = {val}")
+                            logger.info(f"[VIN Decode] SET fuelType = {decoded['fuelType']}")
                     
                     # Verify we got the essential data
                     if decoded["year"] and decoded["make"] and decoded["model"]:
