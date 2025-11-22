@@ -8,6 +8,7 @@ export default function ListCar() {
   const [models, setModels] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [vinDecoded, setVinDecoded] = useState(false);
+  const [validationError, setValidationError] = useState('');
 
   const API = 'https://revomotors.onrender.com';
   const YEARS = Array.from({length: 36}, (_, i) => (2025 - i).toString());
@@ -17,12 +18,12 @@ export default function ListCar() {
   }, []);
 
   useEffect(() => {
-    if (!form.year) {setMakes([]); return;}
+    if (!form.year) {setMakes([]); setForm(prev => ({...prev, make: '', model: '', trim: ''})); return;}
     fetch(`${API}/api/cars/makes?year=${form.year}`).then(r => r.json()).then(d => setMakes(d || [])).catch(() => setMakes([]));
   }, [form.year]);
 
   useEffect(() => {
-    if (!form.make || !form.year) {setModels([]); return;}
+    if (!form.make || !form.year) {setModels([]); setForm(prev => ({...prev, model: '', trim: ''})); return;}
     fetch(`${API}/api/cars/models?make=${form.make}&year=${form.year}`).then(r => r.json()).then(d => setModels(d || [])).catch(() => setModels([]));
   }, [form.make, form.year]);
 
@@ -49,6 +50,22 @@ export default function ListCar() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validation
+    if (!form.year) {
+      setValidationError('❌ Year is required');
+      return;
+    }
+    if (!form.make) {
+      setValidationError('❌ Make is required');
+      return;
+    }
+    if (!form.model) {
+      setValidationError('❌ Model is required - no models available for this Make/Year combination');
+      return;
+    }
+    
+    setValidationError('');
     setLoading(true);
     try {
       const res = await fetch(`${API}/api/leads/webhook/lead_received`, {
@@ -61,11 +78,12 @@ export default function ListCar() {
         alert('✓ Success! ID: ' + result.listing_id);
         setForm({vin: '', year: '', make: '', model: '', trim: '', mileage: '', color: '', transmission: 'automatic', fuelType: 'gasoline', titleStatus: 'clean', accidentHistory: 'none', description: '', askingPrice: ''});
         setVinDecoded(false);
+        setValidationError('');
       } else {
-        alert('Error: ' + (result.error || 'Failed'));
+        setValidationError('❌ ' + (result.error || 'Failed to submit'));
       }
     } catch (e) {
-      alert('Error submitting');
+      setValidationError('❌ Error submitting form');
     } finally {
       setLoading(false);
     }
@@ -76,12 +94,19 @@ export default function ListCar() {
   return (
     <div style={{maxWidth: '900px', margin: '0 auto', padding: '24px', fontFamily: 'Arial'}}>
       <h1 style={{fontSize: '32px', marginBottom: '32px'}}>🚗 Vehicle Information</h1>
+      
+      {validationError && (
+        <div style={{backgroundColor: '#ffe6e6', color: '#cc0000', padding: '12px', borderRadius: '4px', marginBottom: '20px', fontWeight: 'bold'}}>
+          {validationError}
+        </div>
+      )}
+
       <form onSubmit={handleSubmit} style={{display: 'flex', flexDirection: 'column', gap: '20px'}}>
         
         <div>
           <label style={st.l}>VIN Number</label>
           <input style={{...st.i, cursor: 'text'}} type="text" value={form.vin} onChange={(e) => {setForm({...form, vin: e.target.value}); setVinDecoded(false);}} onBlur={(e) => handleVINBlur(e.target.value)} />
-          {vinDecoded && <p style={{color: 'green', fontSize: '12px', marginTop: '4px'}}>✓ Decoded</p>}
+          {vinDecoded && <p style={{color: 'green', fontSize: '12px', marginTop: '4px'}}>✓ VIN Decoded</p>}
         </div>
 
         <div>
@@ -99,13 +124,13 @@ export default function ListCar() {
         </div>
 
         <div>
-          <label style={st.l}>Make *</label>
+          <label style={st.l}>Make * {makes.length > 0 && !vinDecoded && `(${makes.length} available)`}</label>
           {vinDecoded ? (
             <div style={{...st.i, backgroundColor: '#f0f0f0', display: 'flex', alignItems: 'center'}}>
               {form.make} <span style={{color: 'green', marginLeft: '8px', fontSize: '12px'}}>✓ Locked</span>
             </div>
           ) : (
-            <select style={st.i} value={form.make} onChange={(e) => setForm({...form, make: e.target.value, model: '', trim: ''})} disabled={!form.year}>
+            <select style={{...st.i, opacity: !form.year ? 0.5 : 1}} value={form.make} onChange={(e) => setForm({...form, make: e.target.value, model: '', trim: ''})} disabled={!form.year}>
               <option value="">Select make</option>
               {makes.map(m => <option key={m}>{m}</option>)}
             </select>
@@ -113,13 +138,17 @@ export default function ListCar() {
         </div>
 
         <div>
-          <label style={st.l}>Model *</label>
+          <label style={st.l}>Model * {models.length > 0 && !vinDecoded && `(${models.length} available)`}</label>
           {vinDecoded ? (
             <div style={{...st.i, backgroundColor: '#f0f0f0', display: 'flex', alignItems: 'center'}}>
               {form.model} <span style={{color: 'green', marginLeft: '8px', fontSize: '12px'}}>✓ Locked</span>
             </div>
+          ) : models.length === 0 && form.make ? (
+            <div style={{...st.i, backgroundColor: '#f5f5f5', color: '#999', display: 'flex', alignItems: 'center'}}>
+              No models available for {form.make} in {form.year}
+            </div>
           ) : (
-            <select style={st.i} value={form.model} onChange={(e) => setForm({...form, model: e.target.value, trim: ''})} disabled={!form.make}>
+            <select style={{...st.i, opacity: !form.make ? 0.5 : 1}} value={form.model} onChange={(e) => setForm({...form, model: e.target.value, trim: ''})} disabled={!form.make}>
               <option value="">Select model</option>
               {models.map(m => <option key={m}>{m}</option>)}
             </select>
@@ -128,8 +157,8 @@ export default function ListCar() {
 
         <div>
           <label style={st.l}>Trim</label>
-          <select style={st.i} value={form.trim} onChange={(e) => setForm({...form, trim: e.target.value})} disabled={!form.model}>
-            <option value="">Select trim</option>
+          <select style={{...st.i, opacity: !form.model ? 0.5 : 1}} value={form.trim} onChange={(e) => setForm({...form, trim: e.target.value})} disabled={!form.model}>
+            <option value="">Select trim (optional)</option>
             {trims.map(t => <option key={t}>{t}</option>)}
           </select>
         </div>
@@ -141,7 +170,7 @@ export default function ListCar() {
           </div>
           <div>
             <label style={st.l}>Color</label>
-            <select style={st.i} value={form.color} onChange={(e) => setForm({...form, color: e.target.value})}>
+            <select style={{...st.i, opacity: colors.length === 0 ? 0.5 : 1}} value={form.color} onChange={(e) => setForm({...form, color: e.target.value})}>
               <option value="">Select color</option>
               {colors.map(c => <option key={c}>{c}</option>)}
             </select>
