@@ -1116,73 +1116,53 @@ def decode_vin(vin: str):
                         logger.warning(f"[VIN Decode] No results returned from NHTSA for: {vin}")
                         return {"error": "VIN not found in NHTSA database"}
                     
-                    # Extract relevant fields
-                    decoded = {
-                        "vin": vin,
-                        "year": None,
-                        "make": None,
-                        "model": None,
-                        "fuelType": None,
-                        "bodyClass": None,
-                        "series": None
-                    }
-                    
+                    # Store all raw results for debugging
+                    all_fields = {}
                     for r in results:
                         if not r or not isinstance(r, dict):
                             continue
-                        
                         var = r.get("Variable") or ""
                         val = r.get("Value") or ""
-                        
-                        if not var or not val:
-                            continue
-                        
-                        var = str(var).strip()
-                        val = str(val).strip()
-                        
-                        # DEBUG: Log ALL fields
-                        logger.info(f"[VIN Decode DEBUG] {var} = {val}")
-                        
-                        if not val:
-                            continue
-                        
-                        # Match various possible variable names from NHTSA
-                        if var == "Model Year":
-                            decoded["year"] = val
-                            logger.info(f"[VIN Decode] SET year = {val}")
-                        elif var == "Make":
-                            decoded["make"] = val
-                            logger.info(f"[VIN Decode] SET make = {val}")
-                        elif var == "Model":
-                            decoded["model"] = val
-                            logger.info(f"[VIN Decode] SET model = {val}")
-                        elif var == "Body Class":
-                            decoded["bodyClass"] = val
-                            logger.info(f"[VIN Decode] SET bodyClass = {val}")
-                        elif var == "Series":
-                            decoded["series"] = val
-                            logger.info(f"[VIN Decode] SET series = {val}")
-                        elif var == "Fuel Type - Primary" or var == "Fuel Type":
-                            fuel_lower = val.lower()
-                            if "gasoline" in fuel_lower:
-                                decoded["fuelType"] = "Gasoline"
-                            elif "diesel" in fuel_lower:
-                                decoded["fuelType"] = "Diesel"
-                            elif "hybrid" in fuel_lower:
-                                decoded["fuelType"] = "Hybrid"
-                            elif "electric" in fuel_lower or "ev" in fuel_lower:
-                                decoded["fuelType"] = "Electric"
-                            elif "methanol" in fuel_lower:
-                                decoded["fuelType"] = "Methanol"
-                            elif "ethanol" in fuel_lower or "e85" in fuel_lower:
-                                decoded["fuelType"] = "Ethanol (E85)"
-                            elif "lpg" in fuel_lower or "propane" in fuel_lower:
-                                decoded["fuelType"] = "LPG/Propane"
-                            elif "cng" in fuel_lower:
-                                decoded["fuelType"] = "CNG"
-                            else:
-                                decoded["fuelType"] = val
-                            logger.info(f"[VIN Decode] SET fuelType = {decoded['fuelType']}")
+                        if var and val:
+                            all_fields[str(var).strip()] = str(val).strip()
+                    
+                    logger.info(f"[VIN Decode] ALL FIELDS: {all_fields}")
+                    
+                    # Now extract what we need
+                    decoded = {
+                        "vin": vin,
+                        "year": all_fields.get("Model Year"),
+                        "make": all_fields.get("Make"),
+                        "model": all_fields.get("Model"),
+                        "fuelType": None,
+                        "bodyClass": all_fields.get("Body Class"),
+                        "series": all_fields.get("Series")
+                    }
+                    
+                    # Parse fuel type
+                    fuel_raw = all_fields.get("Fuel Type - Primary") or all_fields.get("Fuel Type") or ""
+                    if fuel_raw:
+                        fuel_lower = fuel_raw.lower()
+                        if "gasoline" in fuel_lower:
+                            decoded["fuelType"] = "Gasoline"
+                        elif "diesel" in fuel_lower:
+                            decoded["fuelType"] = "Diesel"
+                        elif "hybrid" in fuel_lower:
+                            decoded["fuelType"] = "Hybrid"
+                        elif "electric" in fuel_lower or "ev" in fuel_lower:
+                            decoded["fuelType"] = "Electric"
+                        elif "methanol" in fuel_lower:
+                            decoded["fuelType"] = "Methanol"
+                        elif "ethanol" in fuel_lower or "e85" in fuel_lower:
+                            decoded["fuelType"] = "Ethanol (E85)"
+                        elif "lpg" in fuel_lower or "propane" in fuel_lower:
+                            decoded["fuelType"] = "LPG/Propane"
+                        elif "cng" in fuel_lower:
+                            decoded["fuelType"] = "CNG"
+                        else:
+                            decoded["fuelType"] = fuel_raw
+                    
+                    logger.info(f"[VIN Decode] Decoded: {decoded}")
                     
                     # Verify we got the essential data
                     if decoded["year"] and decoded["make"] and decoded["model"]:
