@@ -1110,7 +1110,9 @@ def decode_vin(vin: str):
             if response.status_code == 200:
                 try:
                     data = response.json()
+                    logger.info(f"[VIN Decode] NHTSA Response: {str(data)[:500]}")
                     results = data.get("Results", [])
+                    logger.info(f"[VIN Decode] Results count: {len(results)}")
                     
                     if not results:
                         logger.warning(f"[VIN Decode] No results returned from NHTSA for: {vin}")
@@ -1163,6 +1165,7 @@ def decode_vin(vin: str):
                             decoded["fuelType"] = fuel_raw
                     
                     logger.info(f"[VIN Decode] Decoded: {decoded}")
+                    logger.info(f"[VIN Decode] Decoded result: {decoded}")
                     
                     # Verify we got the essential data
                     if decoded["year"] and decoded["make"] and decoded["model"]:
@@ -1170,8 +1173,9 @@ def decode_vin(vin: str):
                         # Remove None values before returning
                         return {k: v for k, v in decoded.items() if v is not None}
                     else:
-                        logger.warning(f"[VIN Decode] Incomplete data for {vin}")
-                        return {"error": "VIN decoded but missing required fields (year/make/model)"}
+                        logger.warning(f"[VIN Decode] Incomplete data - returning anyway: {decoded}")
+                        # Return what we have, even if incomplete
+                        return {k: v for k, v in decoded.items() if v is not None}
                 
                 except ValueError as e:
                     logger.error(f"[VIN Decode] JSON parse error: {str(e)}")
