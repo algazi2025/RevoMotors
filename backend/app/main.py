@@ -1272,13 +1272,12 @@ def get_kbb_value(year: str, make: str, model: str, trim: str, mileage: int, con
     """
     Scrape KBB to get RETAIL prices with trim-level detail
     Then convert to wholesale using 0.60 formula
-    Applies condition adjustments
     """
     try:
         year_int = int(year) if year else 2024
         mileage_int = int(mileage) if mileage else 100000
         
-        logger.info(f"[KBB] Attempting scrape: {year} {make} {model} {trim} | {mileage_int} miles | {condition}")
+        logger.info(f"[KBB] START: {year} {make} {model} {trim} | {mileage_int} miles | {condition}")
         
         # KBB search URL
         kbb_url = (
@@ -1286,7 +1285,6 @@ def get_kbb_value(year: str, make: str, model: str, trim: str, mileage: int, con
             f"startYear={year_int}&endYear={year_int}"
             f"&makeCode1={quote(make.upper())}"
             f"&modelCode1={quote(model.upper())}"
-            f"&maxPrice=100000"
         )
         
         logger.info(f"[KBB] URL: {kbb_url}")
@@ -1296,63 +1294,81 @@ def get_kbb_value(year: str, make: str, model: str, trim: str, mileage: int, con
         }
         
         response = requests.get(kbb_url, headers=headers, timeout=15)
+        logger.info(f"[KBB] Status Code: {response.status_code}")
         
         if response.status_code == 200:
             soup = BeautifulSoup(response.text, 'html.parser')
             
-            # KBB price selectors (multiple attempts for different page layouts)
+            # Log page title to verify we got the right page
+            title = soup.find('title')
+            logger.info(f"[KBB] Page Title: {title.text if title else 'NO TITLE'}")
+            
             prices = []
             
-            # Try different price selectors
+            # Try multiple price selectors
             price_selectors = [
                 'span.ds-price-details',
                 'div[data-testid="price"]',
                 'div.price-value',
-                'span[class*="price"]'
+                'span[class*="price"]',
+                'div[class*="price"]',
+                'h3[class*="price"]'
             ]
             
             for selector in price_selectors:
                 price_elements = soup.select(selector)
-                if price_elements:
-                    logger.info(f"[KBB] Found {len(price_elements)} prices with selector: {selector}")
+                logger.info(f"[KBB] Selector '{selector}' found: {len(price_elements)} elements")
+                if price_elements and len(price_elements) > 0:
+                    for i, element in enumerate(price_elements[:3]):
+                        logger.info(f"[KBB]   Element {i}: {element.get_text(strip=True)[:100]}")
                     break
             
-            for element in price_elements[:10]:  # First 10 listings
+            # Extract all text containing dollar signs as backup
+            page_text = soup.get_text()
+            logger.info(f"[KBB] Page contains '$': {('$' in page_text)}")
+            
+            # Try to find prices in ALL elements
+            for element in soup.find_all(['span', 'div', 'h3', 'p']):
                 try:
                     price_text = element.get_text(strip=True)
-                    # Extract numeric price
-                    price_clean = ''.join(c for c in price_text if c.isdigit())
-                    if price_clean and len(price_clean) >= 4:
-                        price = int(price_clean)
-                        if 1000 < price < 100000:
-                            prices.append(price)
+                    if '$' in price_text and len(price_text) < 50:
+                        price_clean = ''.join(c for c in price_text if c.isdigit())
+                        if price_clean and len(price_clean) >= 4:
+                            price = int(price_clean)
+                            if 1000 < price < 100000:
+                                prices.append(price)
+                                logger.info(f"[KBB] Found price: ${price} from '{price_text}'")
                 except:
-                    continue
+                    pass
+            
+            logger.info(f"[KBB] Total prices extracted: {len(prices)}")
+            if prices:
+                logger.info(f"[KBB] Prices: {prices}")
             
             if prices:
                 avg_retail = sum(prices) / len(prices)
                 
-                logger.info(f"[KBB] Found {len(prices)} prices | Avg: ${int(avg_retail)}")
+                logger.info(f"[KBB] ✅ SUCCESS - Found {len(prices)} prices | Avg Retail: ${int(avg_retail)}")
                 
-                # Apply condition multiplier (adjusts the retail price before wholesale conversion)
+                # Apply condition multiplier
                 condition_multiplier = {
-                    "excellent": 1.10,   # +10% premium condition
-                    "good": 1.0,         # Standard/baseline
-                    "fair": 0.85,        # -15% below average condition
-                    "poor": 0.70         # -30% poor condition
+                    "excellent": 1.10,
+                    "good": 1.0,
+                    "fair": 0.85,
+                    "poor": 0.70
                 }
                 condition_mult = condition_multiplier.get(condition.lower(), 1.0)
                 adjusted_retail = avg_retail * condition_mult
                 
-                # Convert retail to wholesale (0.60 formula)
+                # Convert to wholesale (0.60)
                 wholesale_fair = adjusted_retail * 0.60
-                wholesale_low = wholesale_fair * 0.90    # 10% below fair
-                wholesale_high = wholesale_fair * 1.10   # 10% above fair
+                wholesale_low = wholesale_fair * 0.90
+                wholesale_high = wholesale_fair * 1.10
                 
                 logger.info(
-                    f"[KBB] Condition: {condition} (×{condition_mult}) | "
-                    f"Adjusted Retail: ${int(adjusted_retail)} | "
-                    f"Wholesale: Low=${int(wholesale_low)}, Fair=${int(wholesale_fair)}, High=${int(wholesale_high)}"
+                    f"[KBB] Condition: {condition} (×{condition_mult}) → "
+                    f"Adjusted Retail: ${int(adjusted_retail)} → "
+                    f"Wholesale: ${int(wholesale_low)} - ${int(wholesale_high)}"
                 )
                 
                 return {
@@ -1364,13 +1380,14 @@ def get_kbb_value(year: str, make: str, model: str, trim: str, mileage: int, con
                     "condition": condition
                 }
             
-            logger.warning(f"[KBB] No prices found in response")
+            logger.warning(f"[KBB] ❌ FAILED - No prices found")
         else:
-            logger.warning(f"[KBB] Request failed with status: {response.status_code}")
+            logger.warning(f"[KBB] ❌ Request failed: {response.status_code}")
     
     except Exception as e:
-        logger.error(f"[KBB] Error: {str(e)}")
+        logger.error(f"[KBB] ❌ ERROR: {str(e)}", exc_info=True)
     
+    logger.warning(f"[KBB] ❌ Returning None - will try fallback")
     return None
 
 
