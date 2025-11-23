@@ -1303,20 +1303,20 @@ def calculate_trade_in_fallback(year: str, make: str, model: str, mileage: int, 
         mileage_int = int(mileage) if mileage else 100000
         age = 2024 - year_int
         
-        # Market-based starting prices (retail value) by age
-        # Wholesale will be ~68% of these values
+        # More realistic market-based retail prices by age
+        # These are typical RETAIL prices for average vehicles
         price_by_age = {
-            0: 32000,    # Current year
-            1: 28000,    # 1 year old
-            2: 25000,    # 2 years old
-            3: 22000,    # 3 years old
-            4: 19000,    # 4 years old
-            5: 17000,    # 5 years old
-            6: 15000,    # 6 years old
-            7: 13000,    # 7 years old
-            8: 11000,    # 8 years old
-            9: 9500,     # 9 years old
-            10: 8200,    # 10 years old
+            0: 30000,    # 2024 (current year)
+            1: 26000,    # 2023 (1 year old)
+            2: 22000,    # 2022 (2 years old)
+            3: 18000,    # 2021 (3 years old)
+            4: 15000,    # 2020 (4 years old)
+            5: 12000,    # 2019 (5 years old)
+            6: 9500,     # 2018 (6 years old) ← 2018 KIA should be here
+            7: 7500,     # 2017 (7 years old)
+            8: 6000,     # 2016 (8 years old)
+            9: 5000,     # 2015 (9 years old)
+            10: 4000,    # 2014 (10 years old)
         }
         
         # Get base price for vehicle age
@@ -1343,10 +1343,9 @@ def calculate_trade_in_fallback(year: str, make: str, model: str, mileage: int, 
         make_mult = make_multiplier.get(make, 1.0)
         adjusted_retail = base_retail * make_mult
         
-        # Mileage depreciation (roughly $0.15 per mile)
-        mileage_deduction = (mileage_int / 1000) * 0.15
-        mileage_multiplier = max(0.30, 1.0 - (mileage_deduction / adjusted_retail))
-        value_after_mileage = adjusted_retail * mileage_multiplier
+        # Mileage depreciation (roughly $0.10 per mile for wholesale valuation)
+        mileage_deduction = mileage_int * 0.10
+        value_after_mileage = max(adjusted_retail * 0.25, adjusted_retail - mileage_deduction)
         
         # Condition adjustments
         condition_multiplier = {
