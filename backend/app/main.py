@@ -1268,10 +1268,84 @@ def get_trade_in_value(year: str, make: str, model: str, mileage: int, condition
     return calculate_trade_in_fallback(year, make, model, mileage, condition)
 
 
-def get_kbb_value(year: str, make: str, model: str, trim: str, mileage: int, condition: str = "good"):
+def get_trim_multiplier(year: str, make: str, model: str, trim: str):
     """
-    Scrape KBB to get RETAIL prices with trim-level detail
-    Then convert to wholesale using 0.60 formula
+    Look up actual trim from TRIMS_DATABASE and calculate multiplier based on position
+    Base trim: 0.90x
+    Mid trim: 1.0x
+    Top trim: 1.15x
+    """
+    if not trim:
+        return 1.0  # Default if no trim specified
+    
+    try:
+        year_int = int(year) if year else 2024
+        
+        # Find the trim list for this vehicle
+        trim_list = None
+        for (m, mo, year_range), trims in TRIMS_DATABASE.items():
+            if m.lower() == make.lower() and mo.lower() == model.lower():
+                # Check if year falls in this range
+                year_parts = year_range.split('-')
+                start_year = int(year_parts[0])
+                end_year = int(year_parts[1])
+                if start_year <= year_int <= end_year:
+                    trim_list = trims
+                    break
+        
+        if not trim_list:
+            logger.warning(f"[Trim] No trim data found for {year} {make} {model}")
+            return 1.0
+        
+        # Find trim in list (case-insensitive)
+        trim_lower = trim.lower()
+        trim_index = None
+        for i, t in enumerate(trim_list):
+            if t.lower() == trim_lower or t.lower() in trim_lower or trim_lower in t.lower():
+                trim_index = i
+                break
+        
+        if trim_index is None:
+            logger.warning(f"[Trim] Trim '{trim}' not found in list: {trim_list}")
+            return 1.0
+        
+        # Calculate multiplier based on position
+        num_trims = len(trim_list)
+        
+        if num_trims == 1:
+            multiplier = 1.0  # Only one trim
+        elif num_trims == 2:
+            # Two trims: base and top
+            multiplier = 0.90 if trim_index == 0 else 1.10
+        elif num_trims == 3:
+            # Three trims: base, mid, top
+            if trim_index == 0:
+                multiplier = 0.90  # Base
+            elif trim_index == num_trims - 1:
+                multiplier = 1.10  # Top
+            else:
+                multiplier = 1.0   # Mid
+        else:
+            # 4+ trims: base, lower-mid, upper-mid, top
+            if trim_index == 0:
+                multiplier = 0.88  # Base
+            elif trim_index <= num_trims / 3:
+                multiplier = 0.95  # Lower-mid
+            elif trim_index >= (num_trims * 2 / 3):
+                multiplier = 1.12  # Top
+            else:
+                multiplier = 1.0   # Mid
+        
+        logger.info(f"[Trim] {year} {make} {model} '{trim}' is position {trim_index}/{num_trims-1} = {multiplier}x multiplier")
+        return multiplier
+    
+    except Exception as e:
+        logger.error(f"[Trim] Error calculating multiplier: {str(e)}")
+        return 1.0
+    """
+    Get KBB RETAIL prices (free, public website)
+    Apply trim and condition multipliers
+    Convert to wholesale using 0.60 formula
     """
     try:
         year_int = int(year) if year else 2024
@@ -1279,7 +1353,7 @@ def get_kbb_value(year: str, make: str, model: str, trim: str, mileage: int, con
         
         logger.info(f"[KBB] START: {year} {make} {model} {trim} | {mileage_int} miles | {condition}")
         
-        # KBB search URL
+        # Try KBB's search endpoint with better headers
         kbb_url = (
             f"https://www.kbb.com/cars-for-sale/searchresults.xhtml?"
             f"startYear={year_int}&endYear={year_int}"
@@ -1289,8 +1363,15 @@ def get_kbb_value(year: str, make: str, model: str, trim: str, mileage: int, con
         
         logger.info(f"[KBB] URL: {kbb_url}")
         
+        # Better headers to avoid 403
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Referer': 'https://www.kbb.com/',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1'
         }
         
         response = requests.get(kbb_url, headers=headers, timeout=15)
@@ -1299,76 +1380,64 @@ def get_kbb_value(year: str, make: str, model: str, trim: str, mileage: int, con
         if response.status_code == 200:
             soup = BeautifulSoup(response.text, 'html.parser')
             
-            # Log page title to verify we got the right page
-            title = soup.find('title')
-            logger.info(f"[KBB] Page Title: {title.text if title else 'NO TITLE'}")
-            
+            # Extract ALL price data from page
             prices = []
             
-            # Try multiple price selectors
-            price_selectors = [
-                'span.ds-price-details',
-                'div[data-testid="price"]',
-                'div.price-value',
-                'span[class*="price"]',
-                'div[class*="price"]',
-                'h3[class*="price"]'
-            ]
+            # Look for price patterns in the HTML
+            import re as regex
+            price_pattern = r'\$[\d,]+'
+            all_text = soup.get_text()
+            found_prices = regex.findall(price_pattern, all_text)
             
-            for selector in price_selectors:
-                price_elements = soup.select(selector)
-                logger.info(f"[KBB] Selector '{selector}' found: {len(price_elements)} elements")
-                if price_elements and len(price_elements) > 0:
-                    for i, element in enumerate(price_elements[:3]):
-                        logger.info(f"[KBB]   Element {i}: {element.get_text(strip=True)[:100]}")
-                    break
+            logger.info(f"[KBB] Found {len(found_prices)} price patterns in page")
             
-            # Extract all text containing dollar signs as backup
-            page_text = soup.get_text()
-            logger.info(f"[KBB] Page contains '$': {('$' in page_text)}")
-            
-            # Try to find prices in ALL elements
-            for element in soup.find_all(['span', 'div', 'h3', 'p']):
+            for price_str in found_prices[:10]:
                 try:
-                    price_text = element.get_text(strip=True)
-                    if '$' in price_text and len(price_text) < 50:
-                        price_clean = ''.join(c for c in price_text if c.isdigit())
-                        if price_clean and len(price_clean) >= 4:
-                            price = int(price_clean)
-                            if 1000 < price < 100000:
-                                prices.append(price)
-                                logger.info(f"[KBB] Found price: ${price} from '{price_text}'")
+                    price_clean = price_str.replace('$', '').replace(',', '')
+                    price = int(price_clean)
+                    if 1000 < price < 100000:
+                        prices.append(price)
                 except:
                     pass
             
-            logger.info(f"[KBB] Total prices extracted: {len(prices)}")
-            if prices:
-                logger.info(f"[KBB] Prices: {prices}")
+            logger.info(f"[KBB] Extracted {len(prices)} valid prices: {prices}")
             
             if prices:
                 avg_retail = sum(prices) / len(prices)
+                logger.info(f"[KBB] ✅ Average Retail: ${int(avg_retail)}")
                 
-                logger.info(f"[KBB] ✅ SUCCESS - Found {len(prices)} prices | Avg Retail: ${int(avg_retail)}")
+                # TRIM MULTIPLIER - Dynamically calculated from TRIMS_DATABASE
+                trim_mult = get_trim_multiplier(year, make, model, trim)
                 
-                # Apply condition multiplier
+                logger.info(f"[KBB] Trim '{trim}' multiplier: {trim_mult}x")
+                
+                # Apply trim adjustment to retail
+                trimmed_retail = avg_retail * trim_mult
+                
+                # CONDITION MULTIPLIERS
                 condition_multiplier = {
-                    "excellent": 1.10,
-                    "good": 1.0,
-                    "fair": 0.85,
-                    "poor": 0.70
+                    "excellent": 1.15,   # Premium condition
+                    "good": 1.0,         # Standard/baseline
+                    "fair": 0.85,        # Below average
+                    "poor": 0.70         # Significant issues
                 }
                 condition_mult = condition_multiplier.get(condition.lower(), 1.0)
-                adjusted_retail = avg_retail * condition_mult
                 
-                # Convert to wholesale (0.60)
-                wholesale_fair = adjusted_retail * 0.60
+                logger.info(f"[KBB] Condition '{condition}' multiplier: {condition_mult}x")
+                
+                # Apply condition to trimmed retail
+                final_retail = trimmed_retail * condition_mult
+                
+                logger.info(f"[KBB] Retail progression: ${int(avg_retail)} → (trim) → ${int(trimmed_retail)} → (condition) → ${int(final_retail)}")
+                
+                # CONVERT TO WHOLESALE (0.60 formula)
+                wholesale_fair = final_retail * 0.60
                 wholesale_low = wholesale_fair * 0.90
                 wholesale_high = wholesale_fair * 1.10
                 
                 logger.info(
-                    f"[KBB] Condition: {condition} (×{condition_mult}) → "
-                    f"Adjusted Retail: ${int(adjusted_retail)} → "
-                    f"Wholesale: ${int(wholesale_low)} - ${int(wholesale_high)}"
+                    f"[KBB] FINAL: Retail=${int(final_retail)} → "
+                    f"Wholesale Low=${int(wholesale_low)}, Fair=${int(wholesale_fair)}, High=${int(wholesale_high)}"
                 )
                 
                 return {
@@ -1376,18 +1445,19 @@ def get_kbb_value(year: str, make: str, model: str, trim: str, mileage: int, con
                     "fair": int(max(2000, wholesale_fair)),
                     "max": int(max(3000, wholesale_high)),
                     "source": "kbb",
-                    "retail_price": int(adjusted_retail),
-                    "condition": condition
+                    "retail_price": int(final_retail),
+                    "condition": condition,
+                    "trim": trim
                 }
             
-            logger.warning(f"[KBB] ❌ FAILED - No prices found")
+            logger.warning(f"[KBB] ❌ No prices found")
         else:
             logger.warning(f"[KBB] ❌ Request failed: {response.status_code}")
     
     except Exception as e:
         logger.error(f"[KBB] ❌ ERROR: {str(e)}", exc_info=True)
     
-    logger.warning(f"[KBB] ❌ Returning None - will try fallback")
+    logger.warning(f"[KBB] Returning None - will try fallback")
     return None
 
 
