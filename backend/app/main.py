@@ -1057,7 +1057,7 @@ def get_models(make: str, year: str = None):
 def get_trims(make: str, model: str, year: str = None):
     year_int = int(year or "2024")
     for (m, mo, year_range), trims in TRIMS_DATABASE.items():
-        if m == make and mo == model:
+        if m.lower() == make.lower() and mo.lower() == model.lower():  # Case-insensitive!
             try:
                 start, end = map(int, year_range.split("-"))
                 if start <= year_int <= end:
@@ -1070,7 +1070,7 @@ def get_trims(make: str, model: str, year: str = None):
 def get_engines(make: str, model: str, year: str = None):
     year_int = int(year or "2024")
     for (m, mo, year_range), engines in ENGINE_DATABASE.items():
-        if m == make and mo == model:
+        if m.lower() == make.lower() and mo.lower() == model.lower():  # Case-insensitive!
             try:
                 start, end = map(int, year_range.split("-"))
                 if start <= year_int <= end:
@@ -1215,7 +1215,7 @@ def get_transmissions(make: str, model: str, year: str = None):
     year_int = int(year or "2024")
     key = (make, model, f"{year_int}-{year_int+1}")
     for (m, mo, year_range), trans in TRANSMISSION_DATABASE.items():
-        if m == make and mo == model:
+        if m.lower() == make.lower() and mo.lower() == model.lower():  # Case-insensitive!
             try:
                 start, end = map(int, year_range.split("-"))
                 if start <= year_int <= end:
@@ -1229,7 +1229,7 @@ def get_drive_types(make: str, model: str, year: str = None):
     year_int = int(year or "2024")
     key = (make, model, f"{year_int}-{year_int+1}")
     for (m, mo, year_range), drives in DRIVE_DATABASE.items():
-        if m == make and mo == model:
+        if m.lower() == make.lower() and mo.lower() == model.lower():  # Case-insensitive!
             try:
                 start, end = map(int, year_range.split("-"))
                 if start <= year_int <= end:
