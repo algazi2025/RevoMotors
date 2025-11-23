@@ -1280,7 +1280,7 @@ def get_trade_in_value(year: str, make: str, model: str, mileage: int, condition
                     return {
                         "low": int(trade_in_low),
                         "fair": int(trade_in_fair),
-                        "high": int(trade_in_high)
+                        "max": int(trade_in_high)
                     }
         
         logger.warning(f"[CarsXE] No valid data returned: {response.status_code}")
@@ -1294,63 +1294,96 @@ def get_trade_in_value(year: str, make: str, model: str, mileage: int, condition
 
 def calculate_trade_in_fallback(year: str, make: str, model: str, mileage: int, condition: str = "good"):
     """
-    Calculate estimated trade-in values when API fails
-    Based on rough market averages
+    Calculate wholesale market values (CarMax/Carvana/Vroom style instant offers)
+    Wholesale = 65-70% of retail (includes reconditioning, transport, inspection costs)
+    This is what dealers pay at auction + margin
     """
     try:
         year_int = int(year) if year else 2024
         mileage_int = int(mileage) if mileage else 100000
-        
-        # Base prices by age (rough estimates for 2024 market)
         age = 2024 - year_int
         
-        # Starting base value decreases with age
-        if age <= 2:
-            base_value = 28000
-        elif age <= 4:
-            base_value = 24000
-        elif age <= 6:
-            base_value = 20000
-        elif age <= 8:
-            base_value = 16000
-        elif age <= 10:
-            base_value = 12000
-        else:
-            base_value = 8000
+        # Market-based starting prices (retail value) by age
+        # Wholesale will be ~68% of these values
+        price_by_age = {
+            0: 32000,    # Current year
+            1: 28000,    # 1 year old
+            2: 25000,    # 2 years old
+            3: 22000,    # 3 years old
+            4: 19000,    # 4 years old
+            5: 17000,    # 5 years old
+            6: 15000,    # 6 years old
+            7: 13000,    # 7 years old
+            8: 11000,    # 8 years old
+            9: 9500,     # 9 years old
+            10: 8200,    # 10 years old
+        }
         
-        # Adjust for mileage (roughly $0.10 per mile)
-        mileage_deduction = (mileage_int / 100000) * base_value * 0.3
-        adjusted_value = base_value - mileage_deduction
+        # Get base price for vehicle age
+        base_retail = price_by_age.get(min(age, 10), 6500)
         
-        # Adjust for condition
+        # Brand value retention multipliers
+        make_multiplier = {
+            # Premium/Luxury brands
+            "BMW": 1.15, "Mercedes-Benz": 1.15, "Audi": 1.10, "Lexus": 1.12,
+            "Porsche": 1.20, "Tesla": 1.15, "Jaguar": 1.05,
+            
+            # Japanese brands (excellent reliability)
+            "Toyota": 1.10, "Honda": 1.10, "Nissan": 1.05, "Subaru": 1.08,
+            "Mazda": 1.05, "Mitsubishi": 0.95, "Suzuki": 0.90,
+            
+            # Korean brands
+            "Hyundai": 0.95, "Kia": 0.95, "Genesis": 1.05,
+            
+            # US brands
+            "Ford": 0.95, "Chevrolet": 0.95, "GMC": 0.98, "Dodge": 0.90,
+            "RAM": 1.05, "Jeep": 1.00, "Cadillac": 0.95,
+        }
+        
+        make_mult = make_multiplier.get(make, 1.0)
+        adjusted_retail = base_retail * make_mult
+        
+        # Mileage depreciation (roughly $0.15 per mile)
+        mileage_deduction = (mileage_int / 1000) * 0.15
+        mileage_multiplier = max(0.30, 1.0 - (mileage_deduction / adjusted_retail))
+        value_after_mileage = adjusted_retail * mileage_multiplier
+        
+        # Condition adjustments
         condition_multiplier = {
-            "excellent": 1.15,
-            "good": 1.0,
-            "fair": 0.85,
-            "poor": 0.70
+            "excellent": 1.10,  # Better than average
+            "good": 1.0,        # Normal condition
+            "fair": 0.85,       # Below average
+            "poor": 0.70        # Significant issues
         }
         condition_mult = condition_multiplier.get(condition.lower(), 1.0)
-        fair_value = adjusted_value * condition_mult
+        final_retail = value_after_mileage * condition_mult
         
-        # Calculate range (low/high)
-        low_value = fair_value * 0.85
-        high_value = fair_value * 1.15
+        # WHOLESALE VALUE = 68% of retail
+        # This is what dealers pay at auction + small margin
+        # Includes: inspection, reconditioning, transport, holding costs
+        wholesale_fair = final_retail * 0.68
+        wholesale_low = wholesale_fair * 0.90    # Low end (10% below)
+        wholesale_high = wholesale_fair * 1.10   # High end (10% above)
         
-        logger.info(f"[Fallback] Calculated: low=${int(low_value)}, fair=${int(fair_value)}, high=${int(high_value)}")
+        logger.info(
+            f"[Wholesale] {year} {make} {model} | "
+            f"Age: {age}yr | Mileage: {mileage_int}mi | Condition: {condition} | "
+            f"Retail: ${int(final_retail)} → Wholesale Fair: ${int(wholesale_fair)}"
+        )
         
         return {
-            "low": int(max(2000, low_value)),      # Minimum $2,000
-            "fair": int(max(3000, fair_value)),    # Minimum $3,000
-            "high": int(max(4000, high_value))     # Minimum $4,000
+            "low": int(max(1000, wholesale_low)),      # Minimum $1,000
+            "fair": int(max(2000, wholesale_fair)),    # Minimum $2,000
+            "max": int(max(3000, wholesale_high))      # Minimum $3,000
         }
     
     except Exception as e:
-        logger.error(f"[Fallback] Error calculating: {str(e)}")
-        # Ultimate fallback
+        logger.error(f"[Wholesale] Error: {str(e)}")
+        # Reasonable fallback
         return {
-            "low": 18000,
-            "fair": 22000,
-            "high": 26000
+            "low": 6000,
+            "fair": 10000,
+            "max": 13000
         }
 
 @app.post("/api/leads/webhook/lead_received")
