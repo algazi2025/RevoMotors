@@ -71,7 +71,21 @@ export default function ListCar() {
         const data = await response.json();
         setMakes(data || []);
         setFilteredMakes(data || []);
-        setFormData(prev => ({ ...prev, make: '', model: '', trim: '', engines: '', transmissions: '', driveType: '' }));
+        
+        // Only clear make/model if they're not already set (e.g., from VIN decoder)
+        // If make is already populated, don't clear it
+        setFormData(prev => {
+          const shouldKeepMake = prev.make && prev.make.trim().length > 0;
+          return {
+            ...prev,
+            make: shouldKeepMake ? prev.make : '',
+            model: shouldKeepMake ? prev.model : '',
+            trim: '',
+            engine: '',
+            transmission: '',
+            driveType: ''
+          };
+        });
       } catch (error) {
         console.error('Error fetching makes:', error);
         setMakes([]);
@@ -91,7 +105,19 @@ export default function ListCar() {
         const data = await response.json();
         setModels(data || []);
         setFilteredModels(data || []);
-        setFormData(prev => ({ ...prev, model: '', trim: '', engine: '', transmission: '', driveType: '' }));
+        
+        // Only clear model if it's not already set (e.g., from VIN decoder)
+        setFormData(prev => {
+          const shouldKeepModel = prev.model && prev.model.trim().length > 0;
+          return {
+            ...prev,
+            model: shouldKeepModel ? prev.model : '',
+            trim: '',
+            engine: '',
+            transmission: '',
+            driveType: ''
+          };
+        });
       } catch (error) {
         console.error('Error fetching models:', error);
         setModels([]);
@@ -144,32 +170,42 @@ export default function ListCar() {
         const response = await fetch(`${BACKEND_URL}/api/cars/decode-vin?vin=${vinUpper}`);
         const data = await response.json();
 
-        console.log('[VIN Decoder] Response:', data);
+        console.log('[VIN Decoder] Full Response:', JSON.stringify(data, null, 2));
 
         if (data.error) {
           console.error('VIN Error:', data.error);
-        } else {
-          console.log('[VIN Decoder] Got data:', {
-            year: data.year,
-            make: data.make,
-            model: data.model,
-            fuelType: data.fuelType
-          });
-
-          // Auto-populate form with decoded VIN data
-          const newFormData = {
-            year: data.year || '',
-            make: data.make || '',
-            model: data.model || '',
-            fuelType: (data.fuelType || 'gasoline').toLowerCase(),
-            vin: vinUpper,
-          };
-
-          console.log('[VIN Decoder] Setting form data:', newFormData);
-          setFormData(prev => ({ ...prev, ...newFormData }));
+          setVinDecoding(false);
+          return;
         }
+
+        // Extract the values (handle case sensitivity)
+        const decodedYear = data.year ? String(data.year).trim() : '';
+        const decodedMake = data.make ? String(data.make).trim() : '';
+        const decodedModel = data.model ? String(data.model).trim() : '';
+        const decodedFuelType = data.fuelType ? String(data.fuelType).toLowerCase().trim() : 'gasoline';
+
+        console.log('[VIN Decoder] Parsed values:', {
+          year: decodedYear,
+          make: decodedMake,
+          model: decodedModel,
+          fuelType: decodedFuelType
+        });
+
+        // Update form data in one go
+        setFormData(prev => ({
+          ...prev,
+          vin: vinUpper,
+          year: decodedYear,
+          make: decodedMake,
+          model: decodedModel,
+          fuelType: decodedFuelType,
+        }));
+
+        // Show success message
+        console.log(`[VIN Decoder] ✅ Successfully decoded: ${decodedYear} ${decodedMake} ${decodedModel}`);
       } catch (error) {
         console.error('Error decoding VIN:', error);
+        setFormData(prev => ({ ...prev, vin: vinUpper }));
       } finally {
         setVinDecoding(false);
       }
