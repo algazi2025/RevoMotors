@@ -1309,7 +1309,7 @@ def lead_received(lead: LeadData):
             lead.make,
             lead.model,
             lead.mileage or 0,
-            lead.condition or "good"
+            "good"  # Default condition
         )
         
         # Use CarsXE values if available, otherwise use fallback
