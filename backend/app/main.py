@@ -5,6 +5,7 @@ from typing import Optional
 import requests
 import logging
 import re
+import os
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -1233,6 +1234,61 @@ def get_drive_types(make: str, model: str, year: str = None):
                 pass
     return ["FWD", "RWD", "AWD", "4WD"]
 
+def get_trade_in_value(year: str, make: str, model: str, mileage: int, condition: str = "good"):
+    """
+    Get trade-in values from CarsXE API (Free, no signup required)
+    Returns only trade-in range
+    """
+    try:
+        # Map condition to CarsXE format
+        condition_map = {
+            "excellent": "excellent",
+            "good": "good",
+            "fair": "fair",
+            "poor": "poor"
+        }
+        condition_normalized = condition_map.get(condition.lower(), "good")
+        
+        # CarsXE API endpoint
+        url = "https://www.carsxe.com/api/v1/market/value"
+        
+        params = {
+            "year": year,
+            "make": make,
+            "model": model,
+            "mileage": mileage,
+            "condition": condition_normalized
+        }
+        
+        logger.info(f"[CarsXE] Calling API for: {year} {make} {model}, mileage: {mileage}, condition: {condition_normalized}")
+        
+        response = requests.get(url, params=params, timeout=10)
+        
+        if response.status_code == 200:
+            data = response.json()
+            
+            if data and isinstance(data, dict):
+                # CarsXE returns: fair, low, high
+                trade_in_low = data.get("low", 0)
+                trade_in_fair = data.get("fair", 0)
+                trade_in_high = data.get("high", 0)
+                
+                if trade_in_fair > 0:  # Valid response
+                    logger.info(f"[CarsXE] Trade-in values: low=${trade_in_low}, fair=${trade_in_fair}, high=${trade_in_high}")
+                    
+                    return {
+                        "low": int(trade_in_low),
+                        "fair": int(trade_in_fair),
+                        "high": int(trade_in_high)
+                    }
+        
+        logger.warning(f"[CarsXE] No valid data returned: {response.status_code}")
+    
+    except Exception as e:
+        logger.error(f"[CarsXE] Error: {str(e)}")
+    
+    return None
+
 @app.post("/api/leads/webhook/lead_received")
 def lead_received(lead: LeadData):
     try:
@@ -1246,10 +1302,26 @@ def lead_received(lead: LeadData):
             return {"success": False, "errors": errors}
         
         lead_id = f"LEAD_{lead.vin[:8] if lead.vin else 'NO_VIN'}"
+        
+        # Get trade-in values from CarsXE API (Free, no signup required)
+        trade_in_values = get_trade_in_value(
+            lead.year,
+            lead.make,
+            lead.model,
+            lead.mileage or 0,
+            lead.condition or "good"
+        )
+        
+        # Use CarsXE values if available, otherwise use fallback
+        if trade_in_values:
+            ai_draft_offer = trade_in_values
+        else:
+            ai_draft_offer = {"fair": 24500, "low": 22000, "high": 27000}
+        
         return {
             "success": True,
             "listing_id": lead_id,
-            "ai_draft_offer": {"fair": 24500, "low": 22000, "max": 27000},
+            "ai_draft_offer": ai_draft_offer,
             "message": "Listing received successfully"
         }
     except Exception as e:
