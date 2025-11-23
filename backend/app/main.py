@@ -1238,6 +1238,7 @@ def get_trade_in_value(year: str, make: str, model: str, mileage: int, condition
     """
     Get trade-in values from CarsXE API (Free, no signup required)
     Returns only trade-in range
+    Falls back to calculated values based on vehicle specs
     """
     try:
         # Map condition to CarsXE format
@@ -1273,7 +1274,7 @@ def get_trade_in_value(year: str, make: str, model: str, mileage: int, condition
                 trade_in_fair = data.get("fair", 0)
                 trade_in_high = data.get("high", 0)
                 
-                if trade_in_fair > 0:  # Valid response
+                if trade_in_fair > 0 and trade_in_high > 0:  # Valid response with all fields
                     logger.info(f"[CarsXE] Trade-in values: low=${trade_in_low}, fair=${trade_in_fair}, high=${trade_in_high}")
                     
                     return {
@@ -1287,7 +1288,70 @@ def get_trade_in_value(year: str, make: str, model: str, mileage: int, condition
     except Exception as e:
         logger.error(f"[CarsXE] Error: {str(e)}")
     
-    return None
+    # Fallback: Calculate reasonable trade-in values based on vehicle data
+    return calculate_trade_in_fallback(year, make, model, mileage, condition)
+
+
+def calculate_trade_in_fallback(year: str, make: str, model: str, mileage: int, condition: str = "good"):
+    """
+    Calculate estimated trade-in values when API fails
+    Based on rough market averages
+    """
+    try:
+        year_int = int(year) if year else 2024
+        mileage_int = int(mileage) if mileage else 100000
+        
+        # Base prices by age (rough estimates for 2024 market)
+        age = 2024 - year_int
+        
+        # Starting base value decreases with age
+        if age <= 2:
+            base_value = 28000
+        elif age <= 4:
+            base_value = 24000
+        elif age <= 6:
+            base_value = 20000
+        elif age <= 8:
+            base_value = 16000
+        elif age <= 10:
+            base_value = 12000
+        else:
+            base_value = 8000
+        
+        # Adjust for mileage (roughly $0.10 per mile)
+        mileage_deduction = (mileage_int / 100000) * base_value * 0.3
+        adjusted_value = base_value - mileage_deduction
+        
+        # Adjust for condition
+        condition_multiplier = {
+            "excellent": 1.15,
+            "good": 1.0,
+            "fair": 0.85,
+            "poor": 0.70
+        }
+        condition_mult = condition_multiplier.get(condition.lower(), 1.0)
+        fair_value = adjusted_value * condition_mult
+        
+        # Calculate range (low/high)
+        low_value = fair_value * 0.85
+        high_value = fair_value * 1.15
+        
+        logger.info(f"[Fallback] Calculated: low=${int(low_value)}, fair=${int(fair_value)}, high=${int(high_value)}")
+        
+        return {
+            "low": int(max(2000, low_value)),      # Minimum $2,000
+            "fair": int(max(3000, fair_value)),    # Minimum $3,000
+            "high": int(max(4000, high_value))     # Minimum $4,000
+        }
+    
+    except Exception as e:
+        logger.error(f"[Fallback] Error calculating: {str(e)}")
+        # Ultimate fallback
+        return {
+            "low": 18000,
+            "fair": 22000,
+            "high": 26000
+        }
 
 @app.post("/api/leads/webhook/lead_received")
 def lead_received(lead: LeadData):
@@ -1303,20 +1367,14 @@ def lead_received(lead: LeadData):
         
         lead_id = f"LEAD_{lead.vin[:8] if lead.vin else 'NO_VIN'}"
         
-        # Get trade-in values from CarsXE API (Free, no signup required)
-        trade_in_values = get_trade_in_value(
+        # Get trade-in values from CarsXE API or calculated fallback
+        ai_draft_offer = get_trade_in_value(
             lead.year,
             lead.make,
             lead.model,
             lead.mileage or 0,
-            "good"  # Default condition
+            "good"
         )
-        
-        # Use CarsXE values if available, otherwise use fallback
-        if trade_in_values:
-            ai_draft_offer = trade_in_values
-        else:
-            ai_draft_offer = {"fair": 24500, "low": 22000, "high": 27000}
         
         return {
             "success": True,
