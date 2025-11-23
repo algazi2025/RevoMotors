@@ -135,25 +135,38 @@ export default function ListCar() {
 
   // VIN Decoder
   const handleVinChange = async (vin: string) => {
-    setFormData(prev => ({ ...prev, vin: vin.toUpperCase() }));
+    const vinUpper = vin.toUpperCase();
+    setFormData(prev => ({ ...prev, vin: vinUpper }));
 
-    if (vin.length === 17) {
+    if (vinUpper.length === 17) {
       setVinDecoding(true);
       try {
-        const response = await fetch(`${BACKEND_URL}/api/cars/decode-vin?vin=${vin.toUpperCase()}`);
+        const response = await fetch(`${BACKEND_URL}/api/cars/decode-vin?vin=${vinUpper}`);
         const data = await response.json();
 
+        console.log('[VIN Decoder] Response:', data);
+
         if (data.error) {
-          console.log('VIN Error:', data.error);
+          console.error('VIN Error:', data.error);
         } else {
+          console.log('[VIN Decoder] Got data:', {
+            year: data.year,
+            make: data.make,
+            model: data.model,
+            fuelType: data.fuelType
+          });
+
           // Auto-populate form with decoded VIN data
-          setFormData(prev => ({
-            ...prev,
-            year: data.year || prev.year,
-            make: data.make || prev.make,
-            model: data.model || prev.model,
-            fuelType: data.fuelType?.toLowerCase() || prev.fuelType,
-          }));
+          const newFormData = {
+            year: data.year || '',
+            make: data.make || '',
+            model: data.model || '',
+            fuelType: (data.fuelType || 'gasoline').toLowerCase(),
+            vin: vinUpper,
+          };
+
+          console.log('[VIN Decoder] Setting form data:', newFormData);
+          setFormData(prev => ({ ...prev, ...newFormData }));
         }
       } catch (error) {
         console.error('Error decoding VIN:', error);
